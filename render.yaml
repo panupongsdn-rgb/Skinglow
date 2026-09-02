@@ -1,0 +1,31 @@
+# render.yaml — Render Blueprint for the Skinglow AI service
+#
+# WHAT THIS IS: Render can read this file automatically when you connect
+# a GitHub repo and choose "New +" -> "Blueprint". It pre-fills the service
+# config below instead of you clicking through the dashboard manually.
+#
+# WHAT THIS IS NOT: This file does not create a Render account, connect a
+# repo, or click "Deploy" for you — that part needs a human (see
+# DEPLOY_STEPS.md in the project root for exactly what to click).
+#
+# Free tier notes (as of this writing):
+#   - plan: free requires NO credit card to sign up.
+#   - Free web services sleep after 15 min of inactivity; the next request
+#     takes ~30-50s to wake back up. This is expected, not a bug.
+#   - Free tier gives 750 instance-hours/month, shared across all your free
+#     services under one account.
+
+services:
+  - type: web
+    name: skinglow-ai-service
+    runtime: python
+    plan: free
+    rootDir: ai-service
+    buildCommand: >
+      pip install torch --index-url https://download.pytorch.org/whl/cpu &&
+      pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

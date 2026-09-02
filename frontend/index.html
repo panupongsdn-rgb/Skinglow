@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skinglow — วิเคราะห์ผิวหน้าด้วย AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ivory:#FBF8FD;
+    --panel:#FFFFFF;
+    --ink:#241A33;
+    --ink-soft:#7A6C8E;
+    --sage:#B48EE0;
+    --sage-deep:#3B2A54;
+    --blush:#F3D9E8;
+    --blush-deep:#F0A8CE;
+    --line:#EBE1F5;
+    --radius:18px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ivory);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace; letter-spacing:.02em;}
+  a{color:inherit;}
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:28px 6vw; border-bottom:1px solid var(--line);
+  }
+  .logo{display:flex; align-items:center; gap:10px;}
+  .logo-mark{
+    width:30px; height:30px; border-radius:50%;
+    background:conic-gradient(from 200deg, var(--blush), var(--sage), var(--blush));
+  }
+  .logo-text{font-family:'Fraunces',serif; font-size:1.3rem; font-weight:600;}
+  nav a{font-size:.85rem; margin-left:28px; text-decoration:none; color:var(--ink-soft);}
+
+  .user-menu{display:flex; align-items:center; gap:12px;}
+  .user-name{font-size:.85rem; color:var(--ink-soft); font-weight:600;}
+  .logout-btn{
+    display:flex; align-items:center; justify-content:center;
+    width:34px; height:34px; border-radius:50%; border:1px solid var(--line);
+    background:var(--panel); color:var(--ink-soft); cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .logout-btn:hover{background:var(--sage-deep); color:#fff; border-color:var(--sage-deep);}
+
+  main{padding:6vw; max-width:1180px; margin:0 auto;}
+
+  .hero{
+    display:grid; grid-template-columns:1.1fr 1fr; gap:56px; align-items:center;
+    padding-bottom:56px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-size:.75rem; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--sage); margin-bottom:14px; display:block;
+  }
+  .hero h1{font-size:clamp(2.2rem,4vw,3.2rem); line-height:1.08; color:var(--sage-deep);}
+  .hero h1 em{font-style:italic; color:var(--blush-deep);}
+  .hero p{color:var(--ink-soft); font-size:1.05rem; line-height:1.6; margin-top:18px; max-width:44ch;}
+
+  .stat-row{display:flex; gap:32px; margin-top:32px;}
+  .stat-row div span{display:block;}
+  .stat-num{font-family:'Fraunces',serif; font-size:1.6rem; color:var(--sage-deep);}
+  .stat-label{font-size:.78rem; color:var(--ink-soft); margin-top:2px;}
+
+  /* ---- Scan panel : signature element ---- */
+  .scan-panel{
+    position:relative; aspect-ratio:1/1; border-radius:var(--radius);
+    background:var(--panel); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .scan-ring{
+    position:absolute; inset:8%; border-radius:50%;
+    border:1.5px dashed var(--sage); opacity:.35;
+  }
+  .scan-ring.inner{inset:20%; border-color:var(--blush-deep); animation:spin 14s linear infinite reverse;}
+  .scan-ring.outer{animation:spin 22s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  #preview-img, #camera-video{
+    width:78%; height:78%; object-fit:cover; border-radius:50%;
+    display:none; position:relative; z-index:2;
+  }
+  .drop-zone{
+    z-index:3; text-align:center; padding:20px; cursor:pointer;
+  }
+  .drop-zone svg{margin-bottom:10px;}
+  .drop-zone p{color:var(--ink-soft); font-size:.9rem; margin:4px 0;}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:linear-gradient(120deg, var(--sage), var(--blush-deep)); color:#fff; border:none; border-radius:999px;
+    padding:11px 22px; font-size:.88rem; font-weight:600; cursor:pointer;
+    font-family:'Inter',sans-serif; transition:transform .15s ease, box-shadow .2s ease;
+    box-shadow:0 10px 22px -10px rgba(180,142,224,.6);
+  }
+  .btn:hover{transform:translateY(-1px); box-shadow:0 14px 26px -10px rgba(180,142,224,.7);}
+  .btn.ghost{background:transparent; color:var(--sage-deep); border:1px solid var(--sage-deep); box-shadow:none;}
+  .btn.ghost:hover{background:var(--sage-deep); color:#fff;}
+  .btn-row{display:flex; gap:10px; justify-content:center; margin-top:14px;}
+  input[type=file]{display:none;}
+
+  .scan-line{
+    position:absolute; left:11%; right:11%; height:2px; z-index:4;
+    background:linear-gradient(90deg, transparent, var(--blush-deep), transparent);
+    display:none; box-shadow:0 0 14px 2px var(--blush-deep);
+  }
+  .scanning .scan-line{display:block; animation:scanmove 1.8s ease-in-out infinite;}
+  @keyframes scanmove{0%{top:15%;} 50%{top:85%;} 100%{top:15%;}}
+  .scan-status{
+    position:absolute; bottom:6%; z-index:5; font-family:'IBM Plex Mono',monospace;
+    font-size:.72rem; color:var(--sage-deep); background:rgba(255,255,255,.85);
+    padding:4px 12px; border-radius:999px; display:none;
+  }
+  .scanning .scan-status{display:block;}
+
+  /* ---- Results ---- */
+  section#results{display:none; padding:40px 0 80px; border-top:1px solid var(--line); margin-top:20px;}
+  .results-grid{display:grid; grid-template-columns:1fr 1.3fr; gap:48px; margin-top:32px;}
+
+  .result-image-wrap{position:relative; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
+  .result-image-wrap img{width:100%; display:block;}
+
+  .score-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:26px; display:flex; align-items:center; gap:22px; margin-bottom:20px;
+  }
+  .score-ring{
+    width:88px; height:88px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    background:conic-gradient(var(--sage) calc(var(--pct,0) * 1%), var(--line) 0);
+  }
+  .score-ring-inner{
+    width:70px; height:70px; border-radius:50%; background:var(--panel);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces',serif; font-size:1.3rem; color:var(--sage-deep);
+  }
+  .score-text h3{font-size:1rem; margin-bottom:4px;}
+  .score-text p{color:var(--ink-soft); font-size:.88rem; margin:0;}
+
+  .issue-chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px;}
+  .chip{
+    font-family:'IBM Plex Mono',monospace; font-size:.72rem;
+    padding:6px 12px; border-radius:999px; background:var(--ivory); border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+
+  h2.section-title{font-size:1.4rem; color:var(--sage-deep); margin-bottom:4px;}
+  .section-sub{color:var(--ink-soft); font-size:.9rem; margin-bottom:18px;}
+
+  .products{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px;}
+  .product-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:16px; transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .product-card:hover{transform:translateY(-3px); box-shadow:0 10px 24px -14px rgba(44,79,68,.35);}
+  .product-tag{
+    display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:.68rem;
+    color:var(--blush-deep); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;
+  }
+  .product-card h4{font-size:.98rem; margin-bottom:4px;}
+  .product-card .brand{color:var(--ink-soft); font-size:.8rem; margin-bottom:8px;}
+  .product-card .desc{font-size:.82rem; color:var(--ink-soft); line-height:1.5; margin-bottom:10px;}
+  .product-card .price{font-family:'Fraunces',serif; color:var(--sage-deep); font-size:1.05rem;}
+
+  /* ---- Nav tabs ---- */
+  nav a.nav-link{cursor:pointer; padding-bottom:4px; border-bottom:2px solid transparent; transition:color .15s ease, border-color .15s ease;}
+  nav a.nav-link:hover{color:var(--sage-deep);}
+  nav a.nav-link.active{color:var(--sage-deep); border-bottom-color:var(--blush-deep); font-weight:600;}
+
+  .tab-section{display:none;}
+  .tab-section.active-tab{display:block;}
+
+  .panel-head{margin-bottom:28px;}
+  .panel-head h2{font-size:1.7rem; color:var(--sage-deep); margin-bottom:8px;}
+  .panel-head p{color:var(--ink-soft); font-size:.92rem; max-width:60ch;}
+
+  /* ---- Insight chart ---- */
+  .chart-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:28px;}
+
+  .demo-data-note{
+    background:var(--blush); color:var(--sage-deep); border-radius:12px;
+    padding:12px 16px; font-size:.85rem; margin-bottom:20px; line-height:1.5;
+  }
+
+  .history-list-title{font-size:1.1rem; color:var(--sage-deep); margin:32px 0 14px;}
+  .history-list{display:flex; flex-direction:column; gap:10px;}
+  .history-row{
+    display:flex; align-items:center; gap:16px;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 16px;
+  }
+  .history-row .h-thumb{
+    width:52px; height:52px; border-radius:10px; object-fit:cover; flex-shrink:0; background:var(--ivory);
+  }
+  .history-row .h-main{flex:1; min-width:0;}
+  .history-row .h-date{font-family:'IBM Plex Mono',monospace; font-size:.72rem; color:var(--sage); text-transform:uppercase;}
+  .history-row .h-summary{font-size:.87rem; color:var(--ink); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .history-row .h-score{
+    font-family:'Fraunces',serif; font-size:1.15rem; color:var(--sage-deep); flex-shrink:0; min-width:44px; text-align:right;
+  }
+  .chart-legend{display:flex; flex-wrap:wrap; gap:14px; margin-bottom:18px;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+  .legend-dot{width:10px; height:10px; border-radius:3px; display:inline-block;}
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--ink-soft);
+    background:var(--panel); border:1px dashed var(--line); border-radius:var(--radius);
+  }
+  .empty-state p{margin:10px 0 20px; font-size:.92rem;}
+
+  /* ---- Compare view ---- */
+  .compare-grid{display:grid; grid-template-columns:1fr auto 1fr; gap:24px; align-items:start;}
+  .compare-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
+  .compare-card .cc-image{width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--ivory);}
+  .compare-card .cc-body{padding:18px 20px;}
+  .compare-card .cc-date{font-family:'IBM Plex Mono',monospace; font-size:.72rem; color:var(--sage); text-transform:uppercase; letter-spacing:.06em;}
+  .compare-card h3{font-size:1.05rem; margin:6px 0 12px;}
+  .compare-vs{
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;
+    padding-top:110px;
+  }
+  .compare-vs .arrow{font-size:1.6rem; color:var(--blush-deep);}
+  .delta-list{margin-top:14px; display:flex; flex-direction:column; gap:8px;}
+  .delta-row{display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid var(--line);}
+  .delta-up{color:#E74C3C; font-weight:600;}
+  .delta-down{color:#2E9B6E; font-weight:600;}
+  .delta-flat{color:var(--ink-soft);}
+
+  @media (max-width:860px){
+    .compare-grid{grid-template-columns:1fr;}
+    .compare-vs{padding-top:0; flex-direction:row; justify-content:center;}
+  }
+
+  /* ---- Daily Insights ---- */
+  .disclaimer-note{
+    font-size:.78rem; color:var(--ink-soft); background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:10px 14px; margin-bottom:28px; font-family:'IBM Plex Mono',monospace;
+  }
+  .picks-row{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:40px;}
+  .pick-card{
+    background:linear-gradient(160deg, var(--panel), var(--ivory)); border:1px solid var(--line);
+    border-radius:var(--radius); padding:20px; position:relative;
+  }
+  .pick-badge{
+    display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:.66rem; text-transform:uppercase;
+    letter-spacing:.06em; padding:3px 10px; border-radius:999px; margin-bottom:10px;
+  }
+  .pick-badge.personalized{background:var(--sage-deep); color:#fff;}
+  .pick-badge.rotating{background:var(--blush); color:var(--sage-deep);}
+  .pick-card h4{font-size:1rem; margin-bottom:6px; line-height:1.3;}
+  .pick-card p{font-size:.83rem; color:var(--ink-soft); line-height:1.5; margin:0;}
+
+  .filter-chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:22px;}
+  .filter-chip{
+    font-family:'IBM Plex Mono',monospace; font-size:.75rem; padding:6px 14px; border-radius:999px;
+    border:1px solid var(--line); background:var(--panel); color:var(--ink-soft); cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .filter-chip.active{background:var(--sage-deep); border-color:var(--sage-deep); color:#fff;}
+
+  .article-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px;}
+  .article-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 20px;
+  }
+  .article-card summary{
+    cursor:pointer; list-style:none; display:flex; flex-direction:column; gap:8px;
+  }
+  .article-card summary::-webkit-details-marker{display:none;}
+  .article-tag{
+    display:inline-flex; align-items:center; gap:6px; font-family:'IBM Plex Mono',monospace;
+    font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft);
+  }
+  .article-tag .dot{width:8px; height:8px; border-radius:2px; display:inline-block;}
+  .article-card h4{font-size:1rem; margin:0;}
+  .article-card .teaser{font-size:.85rem; color:var(--ink-soft); line-height:1.5; margin:0;}
+  .article-card .meta{font-size:.72rem; color:var(--sage); font-family:'IBM Plex Mono',monospace;}
+  .article-body{
+    margin-top:14px; padding-top:14px; border-top:1px solid var(--line);
+    font-size:.88rem; line-height:1.75; color:var(--ink);
+  }
+  .article-body p{margin:0 0 12px;}
+  .article-body ol, .article-body ul{margin:0 0 12px; padding-left:20px;}
+  .article-body li{margin-bottom:6px;}
+
+  @media (max-width:860px){
+    .picks-row{grid-template-columns:1fr;}
+  }
+
+  footer{padding:30px 6vw; text-align:center; color:var(--ink-soft); font-size:.8rem; border-top:1px solid var(--line);}
+
+  @media (max-width:860px){
+    .hero{grid-template-columns:1fr;}
+    .results-grid{grid-template-columns:1fr;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .scan-ring, .scan-line{animation:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark"></div>
+    <span class="logo-text">Skinglow</span>
+  </div>
+  <nav>
+    <a href="#" class="nav-link active" data-tab="scan">วิเคราะห์ผิว</a>
+    <a href="#" class="nav-link" data-tab="daily">Daily Insights</a>
+    <a href="#" class="nav-link" data-tab="insight">Insight</a>
+    <a href="#" class="nav-link" data-tab="compare">Compare My Skin</a>
+  </nav>
+  <div class="user-menu">
+    <span class="user-name" id="userNameLabel"></span>
+    <button type="button" class="logout-btn" id="logoutBtn" title="ออกจากระบบ">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+<div id="scanTab" class="tab-section active-tab">
+  <section class="hero" id="scan">
+    <div>
+      <span class="eyebrow">AI Skin Analysis</span>
+      <h1>รู้จักผิวคุณ<br><em>ก่อนเลือกสกินแคร์</em></h1>
+      <p>อัปโหลดรูปหรือถ่ายภาพใบหน้า ระบบ AI จะตรวจจับปัญหาผิว — สิว จุดด่างดำ ถุงใต้ตา รอยแดง ความมัน และริ้วรอย — พร้อมแนะนำผลิตภัณฑ์ที่ตรงจุดสำหรับคุณ</p>
+      <div class="stat-row">
+        <div><span class="stat-num mono">6</span><span class="stat-label">ปัญหาผิวที่ตรวจจับได้</span></div>
+        <div><span class="stat-num mono">&lt;10s</span><span class="stat-label">เวลาประมวลผล</span></div>
+        <div><span class="stat-num mono">100+</span><span class="stat-label">ผลิตภัณฑ์แนะนำ</span></div>
+      </div>
+    </div>
+
+    <div class="scan-panel" id="scanPanel">
+      <div class="scan-ring outer"></div>
+      <div class="scan-ring inner"></div>
+      <div class="scan-line"></div>
+      <div class="scan-status">กำลังวิเคราะห์ผิว...</div>
+
+      <img id="preview-img" alt="ภาพตัวอย่างใบหน้า">
+      <video id="camera-video" autoplay playsinline muted></video>
+
+      <div class="drop-zone" id="dropZone">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6B4E96" stroke-width="1.5"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round"/></svg>
+        <p>ลากรูปมาวาง หรือคลิกเพื่ออัปโหลด</p>
+        <div class="btn-row">
+          <button class="btn" id="uploadBtn" type="button">เลือกรูปภาพ</button>
+          <button class="btn ghost" id="cameraBtn" type="button">เปิดกล้อง</button>
+        </div>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp">
+      </div>
+    </div>
+  </section>
+
+  <section id="results">
+    <h2 class="section-title">ผลการวิเคราะห์ผิว</h2>
+    <p class="section-sub" id="resultSummary">—</p>
+
+    <div class="results-grid">
+      <div>
+        <div class="result-image-wrap">
+          <img id="resultImage" alt="ผลการวิเคราะห์พร้อมกรอบตรวจจับ">
+        </div>
+      </div>
+
+      <div>
+        <div class="score-card">
+          <div class="score-ring" id="scoreRing">
+            <div class="score-ring-inner"><span id="scoreNumber">--</span></div>
+          </div>
+          <div class="score-text">
+            <h3>คะแนนสุขภาพผิว</h3>
+            <p>ยิ่งคะแนนสูง ผิวยิ่งอยู่ในสภาพดี</p>
+          </div>
+        </div>
+
+        <div class="issue-chips" id="issueChips"></div>
+
+        <h2 class="section-title" style="font-size:1.1rem;">ผลิตภัณฑ์แนะนำสำหรับคุณ</h2>
+        <p class="section-sub">คัดเลือกตามปัญหาผิวที่ตรวจพบ</p>
+        <div class="products" id="productList"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="dailyTab" class="tab-section">
+  <div class="panel-head">
+    <h2>Daily Personalised Insights</h2>
+    <p>เกร็ดความรู้เชิงลึกเรื่องผิวและสกินแคร์ คัดสรรให้เข้ากับปัญหาผิวที่ตรวจพบล่าสุดของคุณ อัปเดตใหม่ทุกวัน</p>
+  </div>
+  <div class="disclaimer-note">ℹ️ เนื้อหาเพื่อการศึกษาทั่วไปเท่านั้น ไม่ใช่คำวินิจฉัยหรือคำแนะนำทางการแพทย์ หากมีปัญหาผิวรุนแรงหรือเรื้อรัง ควรปรึกษาแพทย์ผิวหนัง</div>
+
+  <h3 style="font-size:1rem; color:var(--sage-deep); margin-bottom:14px;">แนะนำสำหรับผิวคุณวันนี้</h3>
+  <div class="picks-row" id="todaysPicks"></div>
+
+  <div class="filter-chips" id="articleFilters"></div>
+  <div class="article-grid" id="articleGrid"></div>
+</div>
+
+<div id="insightTab" class="tab-section">
+  <div class="panel-head">
+    <h2>Insight</h2>
+    <p>ปริมาณปัญหาผิวแต่ละประเภทในแต่ละวัน เพื่อดูว่าผิวคุณเปลี่ยนแปลงไปมากแค่ไหนเมื่อเทียบกับช่วงก่อนหน้า</p>
+  </div>
+  <div class="demo-data-note" id="insightDemoNote" style="display:none;">
+    ยังไม่มีประวัติการวิเคราะห์ของคุณ — กราฟด้านล่างเป็นข้อมูลตัวอย่างเพื่อให้เห็นภาพ ลองสแกนผิวครั้งแรกที่แท็บ "วิเคราะห์ผิว" เพื่อเริ่มเก็บประวัติจริงของคุณเอง
+  </div>
+  <div class="chart-card">
+    <div class="chart-legend" id="chartLegend"></div>
+    <div id="insightChartWrap"></div>
+  </div>
+
+  <h3 class="history-list-title">ประวัติการวิเคราะห์ของคุณ</h3>
+  <div id="historyListWrap"></div>
+</div>
+
+<div id="compareTab" class="tab-section">
+  <div class="panel-head">
+    <h2>Compare My Skin</h2>
+    <p>เปรียบเทียบผลวิเคราะห์ผิวล่าสุดของคุณกับครั้งก่อนหน้า เพื่อดูว่าดีขึ้นหรือแย่ลง</p>
+  </div>
+  <div id="compareContent"></div>
+</div>
+</main>
+
+<footer>© 2026 Skinglow — AI Skin Analysis &amp; Skincare Recommendation</footer>
+<script>
+/* ------------------------------------------------------------
+   Config — points at the real PHP/Python backend. Update these
+   to match your deployment (see DEPLOY_STEPS.md).
+------------------------------------------------------------- */
+const API_ANALYZE_URL = "../backend-php/api/analyze.php"; // relative to frontend/index.html — works both at domain root and in a subfolder (e.g. XAMPP htdocs/skinglow/)
+const LOGIN_PAGE_URL = "login.html";
+
+/* ------------------------------------------------------------
+   Auth guard — this page requires a logged-in session. If there's
+   no token stored, bounce to the login page immediately.
+------------------------------------------------------------- */
+const AUTH_TOKEN = localStorage.getItem('skinglow_token');
+let CURRENT_USER = null;
+try {
+  CURRENT_USER = JSON.parse(localStorage.getItem('skinglow_user') || 'null');
+} catch { CURRENT_USER = null; }
+
+if (!AUTH_TOKEN || !CURRENT_USER) {
+  window.location.href = LOGIN_PAGE_URL;
+  throw new Error('Not authenticated — redirecting to login.'); // stop the rest of this script from running before redirect completes
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const nameLabel = document.getElementById('userNameLabel');
+  if (nameLabel) nameLabel.textContent = CURRENT_USER.full_name || CURRENT_USER.email || '';
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('skinglow_token');
+      localStorage.removeItem('skinglow_user');
+      window.location.href = LOGIN_PAGE_URL;
+    });
+  }
+});
+
+const BOX_COLORS = {
+  acne:      '#FF4757',
+  black_spot: '#2F9E8F',
+  eyebag:    '#9B7A59',
+  redness:   '#E74C3C',
+  oiliness:  '#F1A93E',
+  wrinkle:   '#3498DB',
+};
+
+const scanPanel   = document.getElementById('scanPanel');
+const dropZone    = document.getElementById('dropZone');
+const fileInput   = document.getElementById('fileInput');
+const previewImg  = document.getElementById('preview-img');
+const cameraVideo = document.getElementById('camera-video');
+const uploadBtn   = document.getElementById('uploadBtn');
+const cameraBtn   = document.getElementById('cameraBtn');
+
+const resultsSection = document.getElementById('results');
+const resultImage    = document.getElementById('resultImage');
+const resultSummary  = document.getElementById('resultSummary');
+const scoreNumber    = document.getElementById('scoreNumber');
+const scoreRing      = document.getElementById('scoreRing');
+const issueChips     = document.getElementById('issueChips');
+const productList    = document.getElementById('productList');
+
+let cameraStream = null;
+
+/* ------------------------------------------------------------
+   Upload flow
+------------------------------------------------------------- */
+uploadBtn.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('click', (e) => { if (e.target === dropZone) fileInput.click(); });
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleImageFile(fileInput.files[0]);
+});
+
+['dragover','dragleave','drop'].forEach(evt => {
+  scanPanel.addEventListener(evt, (e) => e.preventDefault());
+});
+scanPanel.addEventListener('drop', (e) => {
+  const file = e.dataTransfer.files[0];
+  if (file) handleImageFile(file);
+});
+
+/* ------------------------------------------------------------
+   Camera flow
+------------------------------------------------------------- */
+cameraBtn.addEventListener('click', async () => {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    cameraVideo.srcObject = cameraStream;
+    cameraVideo.style.display = 'block';
+    previewImg.style.display = 'none';
+    dropZone.style.display = 'none';
+    cameraBtn.textContent = 'ถ่ายภาพ';
+    cameraBtn.onclick = capturePhoto;
+  } catch (err) {
+    alert('ไม่สามารถเข้าถึงกล้องได้: ' + err.message);
+  }
+});
+
+function capturePhoto() {
+  if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) {
+    alert('กล้องยังไม่พร้อม กรุณารอสักครู่แล้วลองอีกครั้ง');
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cameraVideo.videoWidth;
+  canvas.height = cameraVideo.videoHeight;
+  canvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      alert('ไม่สามารถถ่ายภาพได้ กรุณาลองใหม่อีกครั้ง');
+      return;
+    }
+    stopCamera();
+    handleImageFile(new File([blob], 'capture.jpg', { type: 'image/jpeg' }));
+  }, 'image/jpeg', 0.92);
+}
+
+function stopCamera() {
+  if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+  cameraVideo.style.display = 'none';
+  cameraBtn.textContent = 'เปิดกล้อง';
+  cameraBtn.onclick = null;
+  cameraBtn.addEventListener('click', () => cameraBtn.click()); // no-op guard
+}
+
+/* ------------------------------------------------------------
+   Handle chosen/captured image -> preview -> send to API
+------------------------------------------------------------- */
+function handleImageFile(file) {
+  dropZone.style.display = 'none';
+  previewImg.src = URL.createObjectURL(file);
+  previewImg.style.display = 'block';
+  submitForAnalysis(file);
+}
+
+async function submitForAnalysis(file) {
+  scanPanel.classList.add('scanning');
+  resultsSection.style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const res = await fetch(API_ANALYZE_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN },
+      body: formData,
+    });
+
+    if (res.status === 401) {
+      // token missing/expired — session no longer valid, send back to login
+      localStorage.removeItem('skinglow_token');
+      localStorage.removeItem('skinglow_user');
+      window.location.href = LOGIN_PAGE_URL;
+      return;
+    }
+
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error(`API error ${res.status} (no response body)`);
+    }
+    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+    renderResults(json.data);
+  } catch (err) {
+    console.error('Analysis failed:', err);
+    const msg = (err && err.message) ? err.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+    const isColdStartLikely = /^API error (502|503|504)|Failed to fetch/.test(msg);
+    alert(
+      'ไม่สามารถวิเคราะห์รูปภาพได้: ' + msg +
+      (isColdStartLikely
+        ? '\n\nหากเพิ่ง deploy หรือไม่มีคนใช้งานนานเกิน 15 นาที AI service บน Render free tier อาจกำลัง sleep อยู่ — รอ 30-60 วินาทีแล้วลองใหม่อีกครั้ง'
+        : '')
+    );
+    dropZone.style.display = 'block';
+    previewImg.style.display = 'none';
+  } finally {
+    scanPanel.classList.remove('scanning');
+  }
+}
+
+
+/* ------------------------------------------------------------
+   Render results
+------------------------------------------------------------- */
+function renderResults(data) {
+  resultsSection.style.display = 'block';
+  resultImage.src = data.processed_image || data.original_image || previewImg.src;
+  resultSummary.textContent = data.summary || 'วิเคราะห์เสร็จสมบูรณ์';
+
+  const score = Math.round(data.skin_score ?? 0);
+  scoreNumber.textContent = score;
+  scoreRing.style.setProperty('--pct', score);
+
+  issueChips.innerHTML = '';
+  const labelCounts = {};
+  (data.detections || []).forEach(d => {
+    labelCounts[d.label] = (labelCounts[d.label] || 0) + 1;
+  });
+  Object.entries(labelCounts).forEach(([label, count]) => {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = `${label} × ${count}`;
+    issueChips.appendChild(chip);
+  });
+
+  productList.innerHTML = '';
+  (data.recommended_products || []).forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    card.innerHTML = `
+      <span class="product-tag">${p.target_issue}</span>
+      <h4>${p.name}</h4>
+      <div class="brand">${p.brand || ''}</div>
+      <div class="desc">${p.description || ''}</div>
+      <div class="price">${p.price ? '฿' + Number(p.price).toFixed(0) : ''}</div>
+    `;
+    productList.appendChild(card);
+  });
+
+  resultsSection.scrollIntoView({ behavior: 'smooth' });
+
+  pushToHistory(data);
+}
+
+/* ================================================================
+   TAB NAVIGATION
+================================================================= */
+const tabSections = {
+  scan: document.getElementById('scanTab'),
+  daily: document.getElementById('dailyTab'),
+  insight: document.getElementById('insightTab'),
+  compare: document.getElementById('compareTab'),
+};
+
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const tab = link.dataset.tab;
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l === link));
+    Object.entries(tabSections).forEach(([key, el]) => el.classList.toggle('active-tab', key === tab));
+    if (tab === 'daily') renderDailyInsights();
+    if (tab === 'insight') renderInsightChart();
+    if (tab === 'compare') renderCompareView();
+  });
+});
+
+/* ================================================================
+   SCAN HISTORY — real per-user data from the database (history.php),
+   with a synthetic demo seed shown only until the user has real scans.
+================================================================= */
+const HISTORY_URL = "../backend-php/api/history.php";
+const ISSUE_LABELS = ['acne', 'black_spot', 'eyebag', 'redness', 'oiliness', 'wrinkle'];
+let scanHistory = [];
+let usingRealHistory = false; // true once at least one real scan exists — hides the synthetic demo seed
+
+function detectionsToCounts(detections) {
+  const counts = {};
+  ISSUE_LABELS.forEach(l => counts[l] = 0);
+  (detections || []).forEach(d => { counts[d.label] = (counts[d.label] || 0) + 1; });
+  return counts;
+}
+
+function pushToHistory(data) {
+  scanHistory.push({
+    id: data.analysis_id ?? null,
+    date: new Date(),
+    label: 'สแกนของคุณ',
+    skin_score: data.skin_score,
+    counts: detectionsToCounts(data.detections),
+    image: data.processed_image,
+    isReal: true,
+  });
+  usingRealHistory = true;
+
+  // keep chart/compare/daily fresh if those tabs happen to already be visible
+  if (tabSections.insight.classList.contains('active-tab')) renderInsightChart();
+  if (tabSections.compare.classList.contains('active-tab')) renderCompareView();
+  if (tabSections.daily.classList.contains('active-tab')) renderDailyInsights();
+}
+
+/** Fetches this user's real analysis history from the database. Returns
+ *  an array of scanHistory-shaped entries (oldest first), or [] on any
+ *  failure — callers should fall back to the synthetic seed in that case. */
+async function fetchRealHistory() {
+  try {
+    const res = await fetch(HISTORY_URL, {
+      headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN },
+    });
+    if (res.status === 401) {
+      localStorage.removeItem('skinglow_token');
+      localStorage.removeItem('skinglow_user');
+      window.location.href = LOGIN_PAGE_URL;
+      return [];
+    }
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+
+    return json.data
+      .map(row => ({
+        id: row.id,
+        date: new Date(row.created_at),
+        label: new Date(row.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
+        skin_score: row.skin_score,
+        counts: detectionsToCounts(row.detections),
+        image: row.processed_image,
+        isReal: true,
+      }))
+      .sort((a, b) => a.date - b.date); // oldest first, matching the seed's convention
+  } catch (err) {
+    console.error('Failed to load analysis history:', err);
+    return [];
+  }
+}
+
+/** Draws a simple abstract face thumbnail with colored issue markers,
+ *  used only for the synthetic historical seed entries below. */
+function drawPlaceholderFace(counts) {
+  const size = 300;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#FBF8FD';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#F0C9AE';
+  ctx.beginPath();
+  ctx.ellipse(size/2, size/2 + 10, size*0.32, size*0.38, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  let markers = [];
+  Object.entries(counts).forEach(([label, count]) => {
+    for (let i = 0; i < count; i++) markers.push(label);
+  });
+  markers.forEach((label, i) => {
+    const angle = (i / Math.max(markers.length,1)) * Math.PI * 1.6 + 0.6;
+    const r = size * 0.2;
+    const x = size/2 + Math.cos(angle) * r;
+    const y = size/2 + 10 + Math.sin(angle) * r * 1.1;
+    ctx.fillStyle = BOX_COLORS[label] || '#2ECC71';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    const s = 14;
+    ctx.fillRect(x-s/2, y-s/2, s, s);
+    ctx.strokeRect(x-s/2, y-s/2, s, s);
+  });
+
+  return canvas.toDataURL('image/png');
+}
+
+function seedScanHistory() {
+  const today = new Date();
+  const dayTemplates = [
+    { acne: 5, black_spot: 1, eyebag: 2, redness: 2, oiliness: 3, wrinkle: 0, score: 58 },
+    { acne: 4, black_spot: 1, eyebag: 2, redness: 2, oiliness: 3, wrinkle: 0, score: 62 },
+    { acne: 4, black_spot: 2, eyebag: 1, redness: 1, oiliness: 2, wrinkle: 0, score: 65 },
+    { acne: 3, black_spot: 2, eyebag: 1, redness: 1, oiliness: 2, wrinkle: 1, score: 69 },
+    { acne: 2, black_spot: 2, eyebag: 1, redness: 1, oiliness: 1, wrinkle: 1, score: 74 },
+    { acne: 2, black_spot: 1, eyebag: 0, redness: 1, oiliness: 1, wrinkle: 1, score: 78 },
+  ];
+
+  dayTemplates.forEach((t, idx) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (dayTemplates.length - idx));
+    const counts = { acne: t.acne, black_spot: t.black_spot, eyebag: t.eyebag, redness: t.redness, oiliness: t.oiliness, wrinkle: t.wrinkle };
+    scanHistory.push({
+      date: d,
+      label: d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
+      skin_score: t.score,
+      counts,
+      image: drawPlaceholderFace(counts),
+      isReal: false,
+    });
+  });
+}
+async function initScanHistory() {
+  const real = await fetchRealHistory();
+
+  if (real.length > 0) {
+    scanHistory = real;
+    usingRealHistory = true;
+  } else {
+    seedScanHistory(); // brand-new user with no scans yet — show example data instead of an empty chart
+    usingRealHistory = false;
+  }
+
+  // re-render whichever tab is currently visible, now that real data (if any) has loaded
+  if (tabSections.daily.classList.contains('active-tab')) renderDailyInsights();
+  if (tabSections.insight.classList.contains('active-tab')) renderInsightChart();
+  if (tabSections.compare.classList.contains('active-tab')) renderCompareView();
+}
+initScanHistory();
+
+/* ================================================================
+   INSIGHT: stacked bar chart (per-day issue counts) + score trend
+================================================================= */
+/** Per-entry list of past analyses (thumbnail + date + score + summary),
+ *  shown under the chart. Newest first. */
+function renderHistoryList() {
+  const wrap = document.getElementById('historyListWrap');
+  if (!wrap) return;
+
+  const entries = [...scanHistory].reverse(); // newest first for the list view
+
+  if (entries.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><p>ยังไม่มีประวัติการวิเคราะห์</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = `<div class="history-list">` + entries.map(e => {
+    const dateStr = e.isReal
+      ? e.date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : `${e.label} (ตัวอย่าง)`;
+    const scoreStr = (e.skin_score !== null && e.skin_score !== undefined) ? Math.round(e.skin_score) : '—';
+    return `
+      <div class="history-row">
+        <img class="h-thumb" src="${e.image}" alt="">
+        <div class="h-main">
+          <div class="h-date">${dateStr}</div>
+          <div class="h-summary">${summaryFromCounts(e.counts)}</div>
+        </div>
+        <div class="h-score">${scoreStr}</div>
+      </div>
+    `;
+  }).join('') + `</div>`;
+}
+
+function summaryFromCounts(counts) {
+  const parts = Object.entries(counts || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k} x${v}`);
+  return parts.length ? parts.join(', ') : 'ไม่พบปัญหาผิวที่ชัดเจน';
+}
+
+function renderInsightChart() {
+  const demoNote = document.getElementById('insightDemoNote');
+  if (demoNote) demoNote.style.display = usingRealHistory ? 'none' : 'block';
+
+  renderHistoryList();
+
+  const legend = document.getElementById('chartLegend');
+  legend.innerHTML = ISSUE_LABELS.map(l =>
+    `<span class="legend-item"><span class="legend-dot" style="background:${BOX_COLORS[l]}"></span>${l}</span>`
+  ).join('') + `<span class="legend-item"><span class="legend-dot" style="background:#3B2A54"></span>คะแนนผิว (เส้น)</span>`;
+
+  const wrap = document.getElementById('insightChartWrap');
+  const entries = scanHistory.slice(-10); // last up to 10 data points
+
+  if (entries.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><p>ยังไม่มีข้อมูลเพียงพอสำหรับแสดงกราฟ ลองวิเคราะห์ผิวของคุณก่อน</p></div>`;
+    return;
+  }
+
+  const W = 760, H = 320, padL = 40, padR = 20, padT = 20, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxCount = Math.max(1, ...entries.map(e => ISSUE_LABELS.reduce((s,l) => s + (e.counts[l]||0), 0)));
+  const barW = chartW / entries.length * 0.55;
+  const slot = chartW / entries.length;
+
+  let bars = '';
+  let scorePoints = [];
+
+  entries.forEach((e, i) => {
+    const cx = padL + slot * i + slot/2;
+    let yCursor = padT + chartH;
+    const total = ISSUE_LABELS.reduce((s,l) => s + (e.counts[l]||0), 0);
+
+    ISSUE_LABELS.forEach(label => {
+      const val = e.counts[label] || 0;
+      if (val <= 0) return;
+      const segH = (val / maxCount) * chartH;
+      yCursor -= segH;
+      bars += `<rect x="${cx - barW/2}" y="${yCursor.toFixed(1)}" width="${barW.toFixed(1)}" height="${segH.toFixed(1)}" fill="${BOX_COLORS[label]}" rx="2"/>`;
+    });
+
+    bars += `<text x="${cx}" y="${H - padB + 20}" text-anchor="middle" font-size="11" fill="#7A6C8E" font-family="IBM Plex Mono, monospace">${e.label}</text>`;
+    bars += `<text x="${cx}" y="${padT + chartH - (total/maxCount)*chartH - 8}" text-anchor="middle" font-size="11" fill="#241A33" font-family="IBM Plex Mono, monospace">${total}</text>`;
+
+    const scoreY = padT + chartH - ((e.skin_score||0)/100) * chartH;
+    scorePoints.push(`${cx.toFixed(1)},${scoreY.toFixed(1)}`);
+  });
+
+  const linePath = `M ${scorePoints.join(' L ')}`;
+  const dots = entries.map((e,i) => {
+    const cx = padL + slot*i + slot/2;
+    const cy = padT + chartH - ((e.skin_score||0)/100) * chartH;
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="#3B2A54"/>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto;">
+      <line x1="${padL}" y1="${padT+chartH}" x2="${W-padR}" y2="${padT+chartH}" stroke="#EBE1F5"/>
+      ${bars}
+      <path d="${linePath}" fill="none" stroke="#3B2A54" stroke-width="2" stroke-dasharray="4 3"/>
+      ${dots}
+    </svg>
+  `;
+}
+
+/* ================================================================
+   COMPARE MY SKIN
+================================================================= */
+function renderCompareView() {
+  const el = document.getElementById('compareContent');
+
+  if (scanHistory.length < 2) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <p>ต้องมีผลวิเคราะห์อย่างน้อย 2 ครั้งจึงจะเปรียบเทียบได้ ลองสแกนผิวของคุณอีกครั้ง</p>
+      </div>`;
+    return;
+  }
+
+  const current = scanHistory[scanHistory.length - 1];
+  const previous = scanHistory[scanHistory.length - 2];
+
+  const fmtDate = (d) => d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const deltaRows = ISSUE_LABELS.map(label => {
+    const before = previous.counts[label] || 0;
+    const after = current.counts[label] || 0;
+    const diff = after - before;
+    let cls = 'delta-flat', text = 'คงที่';
+    if (diff > 0) { cls = 'delta-up'; text = `+${diff}`; }
+    else if (diff < 0) { cls = 'delta-down'; text = `${diff}`; }
+    return `<div class="delta-row"><span>${label}</span><span class="${cls}">${text}</span></div>`;
+  }).join('');
+
+  const scoreDiff = Math.round(((current.skin_score||0) - (previous.skin_score||0)) * 10) / 10;
+  const scoreCls = scoreDiff > 0 ? 'delta-down' : (scoreDiff < 0 ? 'delta-up' : 'delta-flat');
+  // note: higher score = healthier skin, so an increase is "good" (shown green via delta-down class)
+
+  el.innerHTML = `
+    <div class="compare-grid">
+      <div class="compare-card">
+        <img class="cc-image" src="${previous.image}" alt="ผลวิเคราะห์ก่อนหน้า">
+        <div class="cc-body">
+          <div class="cc-date">${previous.isReal ? fmtDate(previous.date) : previous.label}</div>
+          <h3>ก่อนหน้า</h3>
+          <div class="score-card" style="padding:14px;">
+            <div class="score-ring" style="width:56px;height:56px;--pct:${Math.round(previous.skin_score||0)}">
+              <div class="score-ring-inner" style="width:44px;height:44px;font-size:1rem;">${Math.round(previous.skin_score||0)}</div>
+            </div>
+            <p style="margin:0; font-size:.8rem; color:var(--ink-soft);">คะแนนผิว</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="compare-vs">
+        <span class="arrow">→</span>
+        <div class="delta-list" style="min-width:150px;">
+          <div class="delta-row"><span>คะแนนผิว</span><span class="${scoreCls}">${scoreDiff > 0 ? '+' : ''}${scoreDiff}</span></div>
+          ${deltaRows}
+        </div>
+      </div>
+
+      <div class="compare-card">
+        <img class="cc-image" src="${current.image}" alt="ผลวิเคราะห์ปัจจุบัน">
+        <div class="cc-body">
+          <div class="cc-date">${current.isReal ? fmtDate(current.date) : current.label}</div>
+          <h3>ปัจจุบัน</h3>
+          <div class="score-card" style="padding:14px;">
+            <div class="score-ring" style="width:56px;height:56px;--pct:${Math.round(current.skin_score||0)}">
+              <div class="score-ring-inner" style="width:44px;height:44px;font-size:1rem;">${Math.round(current.skin_score||0)}</div>
+            </div>
+            <p style="margin:0; font-size:.8rem; color:var(--ink-soft);">คะแนนผิว</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ================================================================
+   DAILY PERSONALISED INSIGHTS
+================================================================= */
+const INSIGHT_ARTICLES = [
+  {
+    id: 'pore-size', category: 'oiliness', readTime: '4 นาที',
+    title: 'วิธีลดขนาดรูขุมขนให้ดูเล็กลงอย่างได้ผล',
+    teaser: 'รูขุมขนไม่ได้ "หด" ถาวรได้จริง แต่ควบคุมให้ดูเล็กลงได้ด้วยส่วนผสมและขั้นตอนที่ถูกต้อง',
+    body: `<p>ขนาดรูขุมขนถูกกำหนดโดยพันธุกรรมเป็นหลัก แต่สิ่งที่ทำให้รูขุมขน "ดูใหญ่ขึ้น" ในระยะสั้นคือความมันส่วนเกิน เซลล์ผิวที่สะสมรอบขอบรูขุมขน และการสูญเสียความยืดหยุ่นของผิวตามวัย</p>
+    <p>แนวทางที่ช่วยได้จริง:</p>
+    <ul>
+      <li><strong>ควบคุมความมัน:</strong> ไนอาซินาไมด์ (Niacinamide) 5-10% ช่วยลดการทำงานของต่อมไขมันเมื่อใช้ต่อเนื่อง</li>
+      <li><strong>ผลัดเซลล์ผิวสม่ำเสมอ:</strong> กรดซาลิไซลิก (BHA) ละลายในน้ำมันได้ดี จึงเข้าไปทำความสะอาดภายในรูขุมขนได้ลึกกว่า AHA</li>
+      <li><strong>เสริมความยืดหยุ่นผิว:</strong> เรตินอยด์ช่วยกระตุ้นคอลลาเจนรอบรูขุมขน ทำให้ขอบรูขุมขนกระชับขึ้นในระยะยาว</li>
+      <li><strong>กันแดดทุกวัน:</strong> แสง UV ทำลายคอลลาเจน ซึ่งเป็นสาเหตุหลักที่ทำให้รูขุมขนหย่อนคล้อยและดูใหญ่ขึ้นตามอายุ</li>
+    </ul>
+    <p>สิ่งที่ควรเลี่ยง: การขัดผิวแรงๆ บ่อยเกินไป เพราะจะกระตุ้นให้ต่อมไขมันผลิตน้ำมันชดเชยมากขึ้น ทำให้ปัญหาแย่ลงในระยะยาว</p>`
+  },
+  {
+    id: 'vitamin-c', category: 'black_spot', readTime: '5 นาที',
+    title: 'วิตามินซีและอนุพันธ์: เลือกแบบไหนให้เหมาะกับผิว',
+    teaser: 'L-Ascorbic Acid แรงที่สุดแต่ระคายง่าย ส่วนอนุพันธ์อย่าง MAP หรือ THD Ascorbate อ่อนโยนกว่า — ต่างกันอย่างไร',
+    body: `<p>วิตามินซีเป็นสารต้านอนุมูลอิสระที่ช่วยยับยั้งการสร้างเม็ดสีและกระตุ้นคอลลาเจน แต่รูปแบบที่นำมาใช้ในผลิตภัณฑ์มีหลายชนิด ประสิทธิภาพและความอ่อนโยนต่างกัน:</p>
+    <ul>
+      <li><strong>L-Ascorbic Acid:</strong> รูปแบบบริสุทธิ์ ออกฤทธิ์แรงและเร็วที่สุด แต่ไม่เสถียร สลายตัวง่ายเมื่อโดนแสง/อากาศ และระคายเคืองผิวแพ้ง่ายได้</li>
+      <li><strong>Sodium Ascorbyl Phosphate (SAP):</strong> เสถียรกว่า อ่อนโยน เหมาะกับผิวมันและผิวเป็นสิว มีฤทธิ์ต้านแบคทีเรียอ่อนๆ ด้วย</li>
+      <li><strong>Magnesium Ascorbyl Phosphate (MAP):</strong> ละลายน้ำได้ดี อ่อนโยน เหมาะกับผิวแพ้ง่าย แต่ประสิทธิภาพลดลงจากรูปแบบบริสุทธิ์</li>
+      <li><strong>Ascorbyl Glucoside / THD Ascorbate (Tetrahexyldecyl Ascorbate):</strong> เสถียรมาก ซึมผ่านผิวได้ดี มักพบในเซรั่มเนื้อออยล์รุ่นใหม่</li>
+    </ul>
+    <p>เคล็ดลับ: ควรเก็บผลิตภัณฑ์วิตามินซีในที่มืด ขวดทึบแสง และใช้คู่กับกันแดดเสมอ เพราะวิตามินซีทำงานร่วมกับ SPF ในการปกป้องผิวจากอนุมูลอิสระได้ดีขึ้น</p>`
+  },
+  {
+    id: 'aha-vs-bha', category: 'acne', readTime: '4 นาที',
+    title: 'AHA vs BHA ต่างกันอย่างไร ควรเลือกแบบไหน',
+    teaser: 'ทั้งคู่คือสารผลัดเซลล์ผิว แต่ละลายในตัวทำละลายต่างชนิดกัน จึงเหมาะกับปัญหาผิวคนละแบบ',
+    body: `<p><strong>AHA (Alpha Hydroxy Acid)</strong> เช่น Glycolic Acid, Lactic Acid ละลายในน้ำ ออกฤทธิ์ที่ผิวชั้นบนเป็นหลัก ช่วยผลัดเซลล์ผิวที่หมองคล้ำ ลดรอยดำตื้นๆ และกระตุ้นความชุ่มชื้น เหมาะกับผิวแห้ง ผิวหมองคล้ำ หรือผิวที่มีปัญหาสีผิวไม่สม่ำเสมอ</p>
+    <p><strong>BHA (Beta Hydroxy Acid)</strong> หลักๆ คือ Salicylic Acid ละลายในน้ำมันได้ จึงแทรกซึมเข้าไปทำความสะอาดภายในรูขุมขนที่อุดตันด้วยน้ำมันและเซลล์ผิวตายได้ดีกว่า เหมาะกับผิวมัน ผิวเป็นสิวอุดตัน และรูขุมขนกว้าง</p>
+    <p>สรุปง่ายๆ: ผิวแห้ง/หมองคล้ำ → เอียงไปทาง AHA, ผิวมัน/เป็นสิว → เอียงไปทาง BHA หลายคนใช้ทั้งคู่สลับกันได้ แต่ไม่ควรใช้พร้อมกันในตอนเริ่มต้น เพราะอาจระคายเคืองง่าย ควรเริ่มจากความเข้มข้นต่ำ 2-3 ครั้ง/สัปดาห์ และทากันแดดทุกเช้าเสมอเมื่อใช้กรดผลัดเซลล์ผิว</p>`
+  },
+  {
+    id: 'azelaic-acid', category: 'redness', readTime: '3 นาที',
+    title: '5 ข้อเท็จจริงเกี่ยวกับ Azelaic Acid',
+    teaser: 'กรดจากธรรมชาติที่พบในข้าวสาลี ข้าวไรย์ และข้าวบาร์เลย์ อ่อนโยนแต่ครอบคลุมหลายปัญหาผิว',
+    body: `<ol>
+      <li><strong>ใช้ได้กับหลายปัญหาผิวพร้อมกัน:</strong> ทั้งสิว รอยแดง และรอยดำหลังสิว เพราะมีฤทธิ์ต้านแบคทีเรีย ลดการอักเสบ และยับยั้งเอนไซม์ที่สร้างเม็ดสีเกิน</li>
+      <li><strong>อ่อนโยนกว่ากรดผลัดเซลล์ผิวชนิดอื่น:</strong> ที่ความเข้มข้น 10-20% มักไม่ทำให้ผิวลอกหรือแสบร้อนรุนแรง เหมาะกับผิวแพ้ง่ายและโรซาเซีย</li>
+      <li><strong>ใช้ได้ระหว่างตั้งครรภ์:</strong> เป็นหนึ่งในสารผลัดเซลล์ผิวไม่กี่ชนิดที่แพทย์ผิวหนังมักแนะนำว่าปลอดภัยกว่าเรตินอยด์สำหรับคุณแม่ตั้งครรภ์ (ควรปรึกษาแพทย์ก่อนใช้เสมอ)</li>
+      <li><strong>ช่วยเรื่องผิวไม่เรียบเนียนจากโรซาเซีย:</strong> งานวิจัยทางคลินิกพบว่าช่วยลดรอยแดงและตุ่มอักเสบในผู้ที่มีผิวโรซาเซียได้</li>
+      <li><strong>ต้องใช้ต่อเนื่องถึงเห็นผล:</strong> ส่วนใหญ่ต้องใช้สม่ำเสมอ 8-12 สัปดาห์ขึ้นไปจึงจะเห็นความเปลี่ยนแปลงชัดเจน เพราะออกฤทธิ์แบบค่อยเป็นค่อยไป ไม่ใช่สารที่เห็นผลทันที</li>
+    </ol>`
+  },
+  {
+    id: 'niacinamide', category: 'oiliness', readTime: '3 นาที',
+    title: 'Niacinamide คืออะไร ทำไมเป็นส่วนผสมยอดฮิต',
+    teaser: 'วิตามินบี 3 ตัวเก่งที่ทำได้หลายหน้าที่ในขวดเดียว ตั้งแต่ควบคุมมันไปจนถึงเสริมเกราะผิว',
+    body: `<p>Niacinamide (Vitamin B3) เป็นหนึ่งในส่วนผสมที่งานวิจัยรองรับมากที่สุดตัวหนึ่ง เพราะทำงานได้หลายด้านพร้อมกัน:</p>
+    <ul>
+      <li>ควบคุมการผลิตซีบัม (น้ำมัน) ช่วยลดความมันเงาและรูขุมขนกว้าง</li>
+      <li>เสริมสร้างเกราะปกป้องผิว (skin barrier) ด้วยการกระตุ้นการสร้างเซราไมด์ตามธรรมชาติ</li>
+      <li>ลดเลือนรอยดำจากสิวและจุดด่างดำแบบไม่ระคายเคืองผิว</li>
+      <li>ลดรอยแดงและการอักเสบเล็กน้อย</li>
+    </ul>
+    <p>ความเข้มข้นที่นิยมใช้คือ 5-10% ใช้ได้ทั้งเช้าและเย็น เข้ากันได้ดีกับส่วนผสมเกือบทุกชนิด รวมถึงเรตินอลและกรดผลัดเซลล์ผิว จึงเหมาะเป็นส่วนผสม "พื้นฐาน" ที่แทบทุกสูตรผิวใช้ร่วมกันได้</p>`
+  },
+  {
+    id: 'retinoids-101', category: 'wrinkle', readTime: '5 นาที',
+    title: 'Retinoids เบื้องต้น: Retinol vs Retinal vs Tretinoin',
+    teaser: 'สามชนิดนี้อยู่ในตระกูลเดียวกัน แต่ระยะเวลาออกฤทธิ์และความแรงต่างกันมาก',
+    body: `<p>เรตินอยด์ (Retinoids) คืออนุพันธ์ของวิตามินเอ ช่วยเร่งการผลัดเซลล์ผิวและกระตุ้นคอลลาเจน แต่ผิวต้องเปลี่ยนรูปสารก่อนจึงจะออกฤทธิ์ได้ ยิ่งต้องเปลี่ยนรูปน้อยขั้น ยิ่งออกฤทธิ์เร็วแต่ก็มักระคายเคืองง่ายกว่า:</p>
+    <ul>
+      <li><strong>Retinol:</strong> หาซื้อได้ทั่วไปแบบไม่ต้องมีใบสั่งแพทย์ ต้องเปลี่ยนรูป 2 ขั้นในผิวก่อนออกฤทธิ์ จึงอ่อนโยนที่สุดแต่เห็นผลช้าที่สุด เหมาะกับผู้เริ่มต้น</li>
+      <li><strong>Retinal (Retinaldehyde):</strong> เปลี่ยนรูปเพียง 1 ขั้น ออกฤทธิ์เร็วและแรงกว่า Retinol แต่ยังไม่ต้องมีใบสั่งแพทย์</li>
+      <li><strong>Tretinoin:</strong> เป็นกรดเรตินอยด์ที่ออกฤทธิ์ได้ทันทีโดยไม่ต้องเปลี่ยนรูป แรงที่สุด แต่ในหลายประเทศต้องมีใบสั่งแพทย์เนื่องจากระคายเคืองง่ายกว่ามาก</li>
+    </ul>
+    <p>คำแนะนำทั่วไป: เริ่มจาก Retinol ความเข้มข้นต่ำ 2-3 คืน/สัปดาห์ ทาแค่กลางคืน และทากันแดดทุกเช้าเสมอ เพราะผิวจะไวต่อแสงแดดมากขึ้นระหว่างใช้เรตินอยด์</p>`
+  },
+  {
+    id: 'sunscreen-why', category: 'general', readTime: '3 นาที',
+    title: 'ทำไมกันแดดถึงสำคัญที่สุดในทุกขั้นตอนดูแลผิว',
+    teaser: 'ไม่ว่าจะใช้เซรั่มแพงแค่ไหน ถ้าขาดกันแดดก็เหมือนใส่ปุ๋ยแล้วปล่อยให้แดดเผาต้นไม้ทุกวัน',
+    body: `<p>รังสี UV เป็นสาเหตุหลักของริ้วรอยก่อนวัย (photoaging) ราวกว่า 80% รวมถึงกระตุ้นการสร้างเม็ดสีให้เกิดฝ้า กระ และรอยดำเข้มขึ้น การใช้สารบำรุงที่ออกฤทธิ์แรง เช่น กรดผลัดเซลล์ผิวหรือเรตินอยด์ ยิ่งทำให้ผิวไวต่อแสงแดดมากขึ้น</p>
+    <p>หลักการเลือกกันแดด: ควรมีค่า SPF 30 ขึ้นไป และป้องกันได้ทั้ง UVA/UVB (broad spectrum) ทาปริมาณให้เพียงพอ (ประมาณ 2 ข้อนิ้วสำหรับใบหน้า) และทาซ้ำทุก 2-3 ชั่วโมงหากอยู่กลางแจ้งนาน สำหรับผิวมัน/เป็นสิว เนื้อเจลหรือเนื้อบางเบาแบบไม่อุดตันรูขุมขน (non-comedogenic) จะช่วยลดโอกาสเกิดสิวจากกันแดดได้</p>`
+  },
+  {
+    id: 'centella', category: 'redness', readTime: '3 นาที',
+    title: 'ใบบัวบก (Centella Asiatica) กับผิวแพ้ง่าย บอบบาง',
+    teaser: 'สารสกัดจากพืชที่ใช้ในตำรับยาแผนโบราณมานาน ปัจจุบันมีงานวิจัยรองรับด้านการสมานผิวและลดการอักเสบ',
+    body: `<p>Centella Asiatica อุดมไปด้วยสารกลุ่ม Triterpenoids เช่น Madecassoside และ Asiaticoside ซึ่งมีคุณสมบัติช่วยลดการอักเสบ กระตุ้นการสร้างคอลลาเจน และเสริมความแข็งแรงให้เกราะปกป้องผิว</p>
+    <p>เหมาะเป็นพิเศษสำหรับผิวที่ระคายเคืองง่าย ผิวที่เพิ่งผ่านการใช้กรดผลัดเซลล์ผิวหรือเรตินอยด์มาใหม่ๆ หรือผิวที่มีรอยแดงจากสิวอักเสบ เพราะช่วยปลอบประโลมผิวโดยไม่เพิ่มความมันหรืออุดตันรูขุมขน มักพบในรูปแบบครีม เซรั่ม หรือมาสก์เนื้อเจลเย็นสบายผิว</p>`
+  },
+  {
+    id: 'eyebag', category: 'eyebag', readTime: '4 นาที',
+    title: 'ถุงใต้ตาและคล้ำใต้ตา เกิดจากอะไร แก้ยังไงได้บ้าง',
+    teaser: 'ผิวรอบดวงตาบางกว่าผิวส่วนอื่นถึง 5 เท่า จึงต้องดูแลต่างจากผิวหน้าส่วนอื่น',
+    body: `<p>ถุงใต้ตาและรอยคล้ำเกิดได้จากหลายสาเหตุร่วมกัน: การนอนไม่พอทำให้เลือดคั่งใต้ผิวบางๆ รอบดวงตา, พันธุกรรม/อายุที่ทำให้ไขมันรอบดวงตาเคลื่อนตัวจนดูเป็นถุง, และการสูญเสียคอลลาเจนตามวัยทำให้ผิวบางลงจนเห็นเส้นเลือดข้างใต้ชัดขึ้น</p>
+    <p>ส่วนผสมที่มีงานวิจัยรองรับสำหรับบริเวณนี้:</p>
+    <ul>
+      <li><strong>Caffeine:</strong> ช่วยกระตุ้นการไหลเวียนเลือดและลดอาการบวมชั่วคราว มักพบในครีม/เจลรอบดวงตาที่ใช้ตอนเช้า</li>
+      <li><strong>Vitamin K + Retinol อ่อนโยน:</strong> ช่วยเรื่องรอยคล้ำจากเส้นเลือดและกระตุ้นการสร้างคอลลาเจนรอบดวงตาในระยะยาว</li>
+      <li><strong>Peptides:</strong> ช่วยเสริมความแข็งแรงของผิวบางๆ บริเวณนี้โดยไม่ระคายเคือง</li>
+    </ul>
+    <p>สิ่งที่ช่วยได้แบบไม่ต้องพึ่งผลิตภัณฑ์: นอนให้พอ ยกหัวเตียงสูงขึ้นเล็กน้อยตอนนอนเพื่อลดการคั่งของเหลว และประคบเย็นตอนเช้าถ้าตื่นมาแล้วบวม ผลิตภัณฑ์รอบดวงตาควรเนื้อบางเบาเป็นพิเศษ เพราะผิวบริเวณนี้บอบบางกว่าที่อื่นมาก ระคายเคืองง่ายกว่าปกติ</p>`
+  },
+];
+
+function getPersonalizedIssueOrder() {
+  const totals = {};
+  ISSUE_LABELS.forEach(l => totals[l] = 0);
+  // weight real scans more heavily than the synthetic seed history
+  scanHistory.forEach(entry => {
+    const weight = entry.isReal ? 3 : 1;
+    ISSUE_LABELS.forEach(l => totals[l] += (entry.counts[l] || 0) * weight);
+  });
+  return Object.entries(totals).sort((a, b) => b[1] - a[1]).filter(([, v]) => v > 0).map(([k]) => k);
+}
+
+function getTodaysPicks() {
+  const priorityIssues = getPersonalizedIssueOrder();
+  const picks = [];
+  const usedIds = new Set();
+
+  priorityIssues.forEach(issue => {
+    if (picks.length >= 2) return;
+    const match = INSIGHT_ARTICLES.find(a => a.category === issue && !usedIds.has(a.id));
+    if (match) { picks.push({ article: match, personalized: true }); usedIds.add(match.id); }
+  });
+
+  const dayIndex = Math.floor(Date.now() / 86400000);
+  let i = 0;
+  while (picks.length < 3 && i < INSIGHT_ARTICLES.length) {
+    const cand = INSIGHT_ARTICLES[(dayIndex + i) % INSIGHT_ARTICLES.length];
+    if (!usedIds.has(cand.id)) { picks.push({ article: cand, personalized: false }); usedIds.add(cand.id); }
+    i++;
+  }
+  return picks;
+}
+
+let activeArticleFilter = 'all';
+
+function renderDailyInsights() {
+  const picksEl = document.getElementById('todaysPicks');
+  picksEl.innerHTML = getTodaysPicks().map(({ article, personalized }) => `
+    <div class="pick-card">
+      <span class="pick-badge ${personalized ? 'personalized' : 'rotating'}">${personalized ? 'แนะนำสำหรับผิวคุณ' : 'คัดสรรวันนี้'}</span>
+      <h4>${article.title}</h4>
+      <p>${article.teaser}</p>
+    </div>
+  `).join('');
+
+  const filtersEl = document.getElementById('articleFilters');
+  const categories = ['all', ...ISSUE_LABELS, 'general'];
+  filtersEl.innerHTML = categories.map(cat => `
+    <span class="filter-chip ${cat === activeArticleFilter ? 'active' : ''}" data-filter="${cat}">
+      ${cat === 'all' ? 'ทั้งหมด' : cat}
+    </span>
+  `).join('');
+  filtersEl.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      activeArticleFilter = chip.dataset.filter;
+      renderDailyInsights();
+    });
+  });
+
+  const gridEl = document.getElementById('articleGrid');
+  const visible = activeArticleFilter === 'all'
+    ? INSIGHT_ARTICLES
+    : INSIGHT_ARTICLES.filter(a => a.category === activeArticleFilter);
+
+  gridEl.innerHTML = visible.map(a => `
+    <details class="article-card">
+      <summary>
+        <span class="article-tag"><span class="dot" style="background:${BOX_COLORS[a.category] || '#8AA79B'}"></span>${a.category}</span>
+        <h4>${a.title}</h4>
+        <span class="meta">${a.readTime} อ่าน · แตะเพื่อดูเนื้อหาเต็ม</span>
+        <p class="teaser">${a.teaser}</p>
+      </summary>
+      <div class="article-body">${a.body}</div>
+    </details>
+  `).join('');
+}
+
+// render the daily tab once up front so it's populated even before first click
+renderDailyInsights();
+
+</script>
+</body>
+</html>
