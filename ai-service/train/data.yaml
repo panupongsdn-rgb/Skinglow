@@ -1,0 +1,35 @@
+# data.yaml — YOLOv8 dataset config for Skinglow
+# Classes match "Skin_Analysis" by FarmasiSkinCare (Roboflow Universe)
+# https://universe.roboflow.com/farmasiskincare-aan8y/skin_analysis/dataset/1
+#
+# ✅ CONFIRMED against the actual downloaded export (data.yaml uploaded
+# 2026-08-12): Roboflow's real class order is
+#   ['Acne', 'Black Spot', 'Eyebag', 'Oilness', 'Redness', 'Wrinkle']
+# which is identical (alphabetical) to the order already used below and
+# throughout the rest of this codebase (main.py, BoundingBoxDrawer.php,
+# schema.sql, frontend). Names here are lowercase snake_case rather than
+# Roboflow's original casing/spelling ("Oilness" -> "oiliness") — that's
+# fine, since YOLO/ultralytics reads whatever string is in `names:` as
+# the literal output label at inference time, and this repo's downstream
+# code expects the snake_case form. The index ORDER is what has to match
+# your label .txt files, not the exact string.
+#
+# Folder layout below matches Roboflow's actual YOLOv8 export structure
+# (train/valid/test, each with images/ + labels/) — this is what you get
+# when you unzip the download, no reorganizing needed.
+
+path: .
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 6
+names: ['acne', 'black_spot', 'eyebag', 'oiliness', 'redness', 'wrinkle']
+
+# Original dataset provenance (keep for citation in your thesis):
+roboflow:
+  workspace: farmasiskincare-aan8y
+  project: skin_analysis
+  version: 1
+  license: Private   # see train/README.md "Licensing note" section — read before publishing your thesis repo
+  url: https://universe.roboflow.com/farmasiskincare-aan8y/skin_analysis/dataset/1

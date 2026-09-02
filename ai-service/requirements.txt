@@ -1,0 +1,23 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+pillow==10.3.0
+pydantic==2.7.1
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+
+# --- Trained model inference ---
+# ultralytics pulls in torch as a dependency. The default PyPI torch wheel
+# includes CUDA support and is huge (700MB+), which risks blowing past
+# free-tier build size/time limits (e.g. Render free web service). Install
+# the CPU-only torch wheel FIRST from PyTorch's own index, then ultralytics,
+# so pip doesn't re-resolve the large CUDA build:
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install ultralytics==8.2.103
+#
+# If your host's build step only reads this file directly (`pip install -r
+# requirements.txt`), keep the two-step install above in your build command
+# instead of relying on this file alone — see render.yaml in this repo.
+ultralytics==8.2.103
+ensemble-boxes==1.0.9
