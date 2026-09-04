@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Skinglow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ivory:#FBF8FD; --panel:#FFFFFF; --ink:#241A33; --ink-soft:#7A6C8E;
+    --sage:#B48EE0; --sage-deep:#3B2A54; --blush:#F3D9E8; --blush-deep:#F0A8CE;
+    --line:#EBE1F5; --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--ivory); color:var(--ink); font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
+  a{color:inherit;}
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:22px 6vw; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .logo{display:flex; align-items:center; gap:10px; font-family:'Fraunces',serif; font-size:1.2rem; font-weight:600;}
+  .logo-mark{width:26px; height:26px; border-radius:50%; background:conic-gradient(from 200deg, var(--blush), var(--sage), var(--blush));}
+  .badge-admin{
+    font-family:'IBM Plex Mono',monospace; font-size:.68rem; text-transform:uppercase;
+    background:var(--sage-deep); color:#fff; padding:3px 10px; border-radius:999px; margin-left:10px;
+  }
+  .user-menu{display:flex; align-items:center; gap:14px;}
+  .user-name{font-size:.85rem; color:var(--ink-soft); font-weight:600;}
+  .back-link{font-size:.85rem; color:var(--sage-deep); text-decoration:none; font-weight:600;}
+  .back-link:hover{text-decoration:underline;}
+  .logout-btn{
+    display:flex; align-items:center; justify-content:center; width:34px; height:34px;
+    border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink-soft); cursor:pointer;
+  }
+  .logout-btn:hover{background:var(--sage-deep); color:#fff; border-color:var(--sage-deep);}
+
+  main{padding:36px 6vw 80px; max-width:1180px; margin:0 auto;}
+
+  nav.tabs{display:flex; gap:8px; margin-bottom:28px; border-bottom:1px solid var(--line);}
+  nav.tabs a{
+    padding:10px 4px; margin-right:24px; font-size:.9rem; color:var(--ink-soft); text-decoration:none;
+    border-bottom:2px solid transparent; cursor:pointer;
+  }
+  nav.tabs a.active{color:var(--sage-deep); font-weight:700; border-bottom-color:var(--blush-deep);}
+
+  .panel-head{margin-bottom:20px;}
+  .panel-head p{color:var(--ink-soft); font-size:.9rem; margin-top:4px;}
+
+  .tab-section{display:none;}
+  .tab-section.active-tab{display:block;}
+
+  table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
+  th, td{text-align:left; padding:12px 14px; font-size:.87rem; border-bottom:1px solid var(--line);}
+  th{font-family:'IBM Plex Mono',monospace; font-size:.72rem; text-transform:uppercase; color:var(--ink-soft); background:var(--ivory);}
+  tr:last-child td{border-bottom:none;}
+  .role-pill{
+    font-family:'IBM Plex Mono',monospace; font-size:.7rem; padding:2px 9px; border-radius:999px;
+  }
+  .role-pill.admin{background:var(--sage-deep); color:#fff;}
+  .role-pill.user{background:var(--line); color:var(--ink-soft);}
+
+  .btn-sm{
+    font-size:.78rem; padding:6px 12px; border-radius:999px; border:1px solid var(--line);
+    background:var(--panel); color:var(--sage-deep); cursor:pointer; margin-right:6px;
+  }
+  .btn-sm:hover{background:var(--sage-deep); color:#fff; border-color:var(--sage-deep);}
+  .btn-sm.danger{color:#B3261E; border-color:#F3B9B9;}
+  .btn-sm.danger:hover{background:#B3261E; color:#fff; border-color:#B3261E;}
+
+  .btn-primary{
+    background:linear-gradient(120deg, var(--sage), var(--blush-deep)); color:#fff; border:none;
+    border-radius:999px; padding:10px 22px; font-size:.85rem; font-weight:700; cursor:pointer;
+    box-shadow:0 8px 18px -10px rgba(180,142,224,.6);
+  }
+  .btn-primary:hover{transform:translateY(-1px);}
+  .btn-ghost{background:transparent; border:1px solid var(--sage-deep); color:var(--sage-deep); border-radius:999px; padding:10px 22px; font-size:.85rem; font-weight:700; cursor:pointer;}
+
+  .toolbar{display:flex; justify-content:flex-end; margin-bottom:14px;}
+
+  /* modal */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(36,26,51,.45);
+    align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal-box{
+    background:var(--panel); border-radius:var(--radius); padding:28px; width:100%; max-width:560px;
+    max-height:85vh; overflow-y:auto;
+  }
+  .modal-box h3{font-size:1.2rem; margin-bottom:16px;}
+  .modal-close{float:right; background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--ink-soft);}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:.78rem; font-weight:600; color:var(--sage-deep); margin-bottom:5px;}
+  .field input, .field select, .field textarea{
+    width:100%; padding:10px 12px; border:1.5px solid var(--line); border-radius:10px;
+    font-family:'Inter',sans-serif; font-size:.88rem; color:var(--ink); background:var(--ivory);
+  }
+  .field textarea{resize:vertical; min-height:70px;}
+  .field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--sage);}
+
+  .history-row{display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid var(--line);}
+  .history-row img{width:48px; height:48px; border-radius:8px; object-fit:cover; background:var(--ivory);}
+  .history-row .h-date{font-family:'IBM Plex Mono',monospace; font-size:.7rem; color:var(--sage);}
+  .history-row .h-summary{font-size:.83rem;}
+  .history-row .h-score{margin-left:auto; font-family:'Fraunces',serif; color:var(--sage-deep);}
+
+  .empty-state{text-align:center; padding:40px 20px; color:var(--ink-soft); background:var(--panel); border:1px dashed var(--line); border-radius:var(--radius);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-mark"></div> Skinglow <span class="badge-admin">Admin</span></div>
+  <div class="user-menu">
+    <a href="index.html" class="back-link">← กลับหน้าวิเคราะห์ผิว</a>
+    <span class="user-name" id="userNameLabel"></span>
+    <button type="button" class="logout-btn" id="logoutBtn" title="ออกจากระบบ">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <nav class="tabs">
+    <a href="#" class="active" data-tab="users">ผู้ใช้งาน</a>
+    <a href="#" data-tab="products">สินค้า</a>
+  </nav>
+
+  <!-- ================= USERS TAB ================= -->
+  <div id="usersTab" class="tab-section active-tab">
+    <div class="panel-head">
+      <h2>รายชื่อผู้ใช้งานทั้งหมด</h2>
+      <p>ดูข้อมูลผู้ใช้แต่ละคน จำนวนครั้งที่วิเคราะห์ผิว และประวัติของแต่ละคนได้</p>
+    </div>
+    <div id="usersTableWrap"></div>
+  </div>
+
+  <!-- ================= PRODUCTS TAB ================= -->
+  <div id="productsTab" class="tab-section">
+    <div class="panel-head">
+      <h2>จัดการสินค้าแนะนำ</h2>
+      <p>เพิ่ม แก้ไข หรือลบสินค้าที่ระบบใช้แนะนำให้ผู้ใช้ตามปัญหาผิวที่ตรวจพบ</p>
+    </div>
+    <div class="toolbar">
+      <button class="btn-primary" id="addProductBtn">+ เพิ่มสินค้าใหม่</button>
+    </div>
+    <div id="productsTableWrap"></div>
+  </div>
+</main>
+
+<!-- ================= USER HISTORY MODAL ================= -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-box">
+    <button class="modal-close" id="closeHistoryModal">&times;</button>
+    <h3 id="historyModalTitle">ประวัติการวิเคราะห์</h3>
+    <div id="historyModalBody"></div>
+  </div>
+</div>
+
+<!-- ================= PRODUCT FORM MODAL ================= -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal-box">
+    <button class="modal-close" id="closeProductModal">&times;</button>
+    <h3 id="productModalTitle">เพิ่มสินค้าใหม่</h3>
+    <form id="productForm">
+      <input type="hidden" id="productId">
+      <div class="field">
+        <label for="productName">ชื่อสินค้า *</label>
+        <input type="text" id="productName" required>
+      </div>
+      <div class="field">
+        <label for="productBrand">แบรนด์</label>
+        <input type="text" id="productBrand">
+      </div>
+      <div class="field">
+        <label for="productIssue">ปัญหาผิวที่ตรงเป้า *</label>
+        <select id="productIssue">
+          <option value="acne">acne</option>
+          <option value="black_spot">black_spot</option>
+          <option value="eyebag">eyebag</option>
+          <option value="redness">redness</option>
+          <option value="oiliness">oiliness</option>
+          <option value="wrinkle">wrinkle</option>
+          <option value="dryness">dryness</option>
+          <option value="general" selected>general</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="productPrice">ราคา (บาท)</label>
+        <input type="number" id="productPrice" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label for="productDesc">คำอธิบาย</label>
+        <textarea id="productDesc"></textarea>
+      </div>
+      <div class="field">
+        <label for="productIngredients">ส่วนผสมหลัก</label>
+        <input type="text" id="productIngredients">
+      </div>
+      <div class="form-error" id="productFormError" style="display:none; color:#B3261E; font-size:.85rem; margin-bottom:12px;"></div>
+      <button type="submit" class="btn-primary" style="width:100%;">บันทึก</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const LOGIN_PAGE_URL = "login.html";
+const APP_PAGE_URL = "index.html";
+const USERS_URL = "../backend-php/api/admin/users.php";
+const USER_ANALYSES_URL = "../backend-php/api/admin/user_analyses.php";
+const PRODUCTS_URL = "../backend-php/api/admin/products.php";
+
+/* ---- Auth guard: must be logged in AND role=admin ---- */
+const AUTH_TOKEN = localStorage.getItem('skinglow_token');
+let CURRENT_USER = null;
+try { CURRENT_USER = JSON.parse(localStorage.getItem('skinglow_user') || 'null'); } catch { CURRENT_USER = null; }
+
+if (!AUTH_TOKEN || !CURRENT_USER) {
+  window.location.href = LOGIN_PAGE_URL;
+  throw new Error('Not authenticated — redirecting to login.');
+}
+if (CURRENT_USER.role !== 'admin') {
+  window.location.href = APP_PAGE_URL;
+  throw new Error('Not an admin — redirecting to app.');
+}
+
+function authHeaders(extra = {}) {
+  return Object.assign({ 'Authorization': 'Bearer ' + AUTH_TOKEN }, extra);
+}
+
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    localStorage.removeItem('skinglow_token');
+    localStorage.removeItem('skinglow_user');
+    window.location.href = LOGIN_PAGE_URL;
+    throw new Error('Session expired');
+  }
+  let json;
+  try { json = await res.json(); } catch { throw new Error(`API error ${res.status}`); }
+  if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+  return json;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('userNameLabel').textContent = CURRENT_USER.full_name || CURRENT_USER.email || '';
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('skinglow_token');
+    localStorage.removeItem('skinglow_user');
+    window.location.href = LOGIN_PAGE_URL;
+  });
+
+  document.querySelectorAll('nav.tabs a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('nav.tabs a').forEach(l => l.classList.toggle('active', l === link));
+      const tab = link.dataset.tab;
+      document.getElementById('usersTab').classList.toggle('active-tab', tab === 'users');
+      document.getElementById('productsTab').classList.toggle('active-tab', tab === 'products');
+      if (tab === 'users') loadUsers();
+      if (tab === 'products') loadProducts();
+    });
+  });
+
+  document.getElementById('closeHistoryModal').addEventListener('click', () => {
+    document.getElementById('historyModal').classList.remove('open');
+  });
+  document.getElementById('closeProductModal').addEventListener('click', () => {
+    document.getElementById('productModal').classList.remove('open');
+  });
+  document.getElementById('addProductBtn').addEventListener('click', () => openProductForm(null));
+  document.getElementById('productForm').addEventListener('submit', saveProduct);
+
+  loadUsers();
+});
+
+/* ================= USERS ================= */
+async function loadUsers() {
+  const wrap = document.getElementById('usersTableWrap');
+  wrap.innerHTML = `<p style="color:var(--ink-soft);">กำลังโหลด...</p>`;
+  try {
+    const json = await apiFetch(USERS_URL, { headers: authHeaders() });
+    renderUsersTable(json.data);
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state"><p>โหลดข้อมูลไม่สำเร็จ: ${err.message}</p></div>`;
+  }
+}
+
+function renderUsersTable(users) {
+  const wrap = document.getElementById('usersTableWrap');
+  if (!users.length) {
+    wrap.innerHTML = `<div class="empty-state"><p>ยังไม่มีผู้ใช้งานในระบบ</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>#</th><th>ชื่อ</th><th>อีเมล</th><th>สิทธิ์</th><th>สแกนแล้ว</th><th>สมัครเมื่อ</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${users.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td>${escapeHtml(u.full_name)}</td>
+            <td>${escapeHtml(u.email)}</td>
+            <td><span class="role-pill ${u.role}">${u.role}</span></td>
+            <td>${u.scan_count}</td>
+            <td>${new Date(u.created_at).toLocaleDateString('th-TH')}</td>
+            <td>
+              <button class="btn-sm" onclick="viewUserHistory(${u.id}, '${escapeHtml(u.full_name).replace(/'/g, "\\'")}')">ดูประวัติ</button>
+              <button class="btn-sm danger" onclick="deleteUser(${u.id})">ลบ</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function viewUserHistory(userId, userName) {
+  const modal = document.getElementById('historyModal');
+  const body = document.getElementById('historyModalBody');
+  document.getElementById('historyModalTitle').textContent = `ประวัติของ ${userName}`;
+  body.innerHTML = `<p style="color:var(--ink-soft);">กำลังโหลด...</p>`;
+  modal.classList.add('open');
+
+  try {
+    const json = await apiFetch(`${USER_ANALYSES_URL}?user_id=${userId}`, { headers: authHeaders() });
+    if (!json.data.length) {
+      body.innerHTML = `<div class="empty-state"><p>ผู้ใช้นี้ยังไม่เคยวิเคราะห์ผิว</p></div>`;
+      return;
+    }
+    body.innerHTML = json.data.map(row => {
+      const score = row.skin_score !== null ? Math.round(row.skin_score) : '—';
+      return `
+        <div class="history-row">
+          <img src="${row.processed_image}" alt="">
+          <div>
+            <div class="h-date">${new Date(row.created_at).toLocaleString('th-TH')}</div>
+            <div class="h-summary">${escapeHtml(row.summary || '')}</div>
+          </div>
+          <div class="h-score">${score}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>โหลดข้อมูลไม่สำเร็จ: ${err.message}</p></div>`;
+  }
+}
+
+async function deleteUser(userId) {
+  if (!confirm('ยืนยันลบผู้ใช้นี้? ประวัติการวิเคราะห์ทั้งหมดของผู้ใช้นี้จะถูกลบไปด้วย และย้อนกลับไม่ได้')) return;
+  try {
+    await apiFetch(`${USERS_URL}?id=${userId}`, { method: 'DELETE', headers: authHeaders() });
+    loadUsers();
+  } catch (err) {
+    alert('ลบไม่สำเร็จ: ' + err.message);
+  }
+}
+
+/* ================= PRODUCTS ================= */
+let allProducts = [];
+
+async function loadProducts() {
+  const wrap = document.getElementById('productsTableWrap');
+  wrap.innerHTML = `<p style="color:var(--ink-soft);">กำลังโหลด...</p>`;
+  try {
+    const json = await apiFetch(PRODUCTS_URL, { headers: authHeaders() });
+    allProducts = json.data;
+    renderProductsTable(allProducts);
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state"><p>โหลดข้อมูลไม่สำเร็จ: ${err.message}</p></div>`;
+  }
+}
+
+function renderProductsTable(products) {
+  const wrap = document.getElementById('productsTableWrap');
+  if (!products.length) {
+    wrap.innerHTML = `<div class="empty-state"><p>ยังไม่มีสินค้าในระบบ</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>ชื่อสินค้า</th><th>แบรนด์</th><th>ปัญหาเป้าหมาย</th><th>ราคา</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${products.map(p => `
+          <tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.brand || '—')}</td>
+            <td>${escapeHtml(p.target_issue)}</td>
+            <td>${p.price ? '฿' + Number(p.price).toFixed(0) : '—'}</td>
+            <td>
+              <button class="btn-sm" onclick="editProduct(${p.id})">แก้ไข</button>
+              <button class="btn-sm danger" onclick="deleteProduct(${p.id})">ลบ</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function openProductForm(product) {
+  document.getElementById('productFormError').style.display = 'none';
+  document.getElementById('productForm').reset();
+  document.getElementById('productId').value = product ? product.id : '';
+  document.getElementById('productModalTitle').textContent = product ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าใหม่';
+
+  if (product) {
+    document.getElementById('productName').value = product.name || '';
+    document.getElementById('productBrand').value = product.brand || '';
+    document.getElementById('productIssue').value = product.target_issue || 'general';
+    document.getElementById('productPrice').value = product.price ?? '';
+    document.getElementById('productDesc').value = product.description || '';
+    document.getElementById('productIngredients').value = product.key_ingredients || '';
+  }
+
+  document.getElementById('productModal').classList.add('open');
+}
+
+function editProduct(id) {
+  const product = allProducts.find(p => p.id === id);
+  if (product) openProductForm(product);
+}
+
+async function saveProduct(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('productFormError');
+  errorEl.style.display = 'none';
+
+  const id = document.getElementById('productId').value;
+  const payload = {
+    name: document.getElementById('productName').value.trim(),
+    brand: document.getElementById('productBrand').value.trim(),
+    target_issue: document.getElementById('productIssue').value,
+    price: document.getElementById('productPrice').value,
+    description: document.getElementById('productDesc').value.trim(),
+    key_ingredients: document.getElementById('productIngredients').value.trim(),
+  };
+
+  try {
+    if (id) {
+      await apiFetch(`${PRODUCTS_URL}?id=${id}`, {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await apiFetch(PRODUCTS_URL, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+    }
+    document.getElementById('productModal').classList.remove('open');
+    loadProducts();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('ยืนยันลบสินค้านี้?')) return;
+  try {
+    await apiFetch(`${PRODUCTS_URL}?id=${id}`, { method: 'DELETE', headers: authHeaders() });
+    loadProducts();
+  } catch (err) {
+    alert('ลบไม่สำเร็จ: ' + err.message);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
