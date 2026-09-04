@@ -3,11 +3,6 @@
 -- MySQL 8.0+ (utf8mb4)
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS skinglow_db
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE skinglow_db;
-
 -- ------------------------------------------------------------
 -- Table: users
 -- ------------------------------------------------------------
@@ -16,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name       VARCHAR(150)    NOT NULL,
     email           VARCHAR(190)    NOT NULL UNIQUE,
     password_hash   VARCHAR(255)    NOT NULL,
+    role            ENUM('user','admin') NOT NULL DEFAULT 'user',
     skin_type       ENUM('normal','oily','dry','combination','sensitive') DEFAULT NULL,
     avatar_path     VARCHAR(255)    DEFAULT NULL,
     is_active       TINYINT(1)      NOT NULL DEFAULT 1,
@@ -66,6 +62,14 @@ CREATE INDEX idx_analysis_user ON analysis_history(user_id);
 -- ------------------------------------------------------------
 -- Seed data (sample)
 -- ------------------------------------------------------------
+
+-- Default admin account — CHANGE THIS PASSWORD after first login in any
+-- environment beyond your own local machine. Email: admin@skinglow.local
+-- Password: ChangeMe123!  (hash below was generated + verified with PHP's
+-- own password_hash()/password_verify(), not typed by hand)
+INSERT INTO users (full_name, email, password_hash, role)
+VALUES ('Site Admin', 'admin@skinglow.local', '$2y$10$4slnw7I/x8seZsncLoXLrO6iO4nRueABdjfTPjYFhUyGrQB.4h3RK', 'admin');
+
 INSERT INTO products (name, brand, description, key_ingredients, target_issue, price)
 VALUES
 ('Salicylic Acid Acne Spot Gel', 'GlowLab', 'เจลจุดสิวช่วยลดการอักเสบและควบคุมความมัน', 'Salicylic Acid 2%, Tea Tree Oil', 'acne', 259.00),
