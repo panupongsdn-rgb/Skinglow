@@ -5,21 +5,29 @@ declare(strict_types=1);
  * Minimal HMAC-signed token helper, shared by login.php (issues tokens) and
  * any endpoint that needs to know who's calling (verifies tokens).
  *
- * Token format: base64(json({sub, exp})) . hmac_sha256(that, JWT_SECRET)
+ * Token format: base64(json({sub, role, exp})) . hmac_sha256(that, JWT_SECRET)
  * Not a standards-compliant JWT — fine for a thesis project, swap for
  * firebase/php-jwt if this ever needs to interoperate with other systems.
  */
 final class Auth
 {
-    public static function issueToken(int $userId): string
+    public static function issueToken(int $userId, string $role = 'user'): string
     {
-        $payload = base64_encode(json_encode(['sub' => $userId, 'exp' => time() + 3600 * 24]));
+        $payload = base64_encode(json_encode([
+            'sub'  => $userId,
+            'role' => $role,
+            'exp'  => time() + 3600 * 24,
+        ]));
         $signature = hash_hmac('sha256', $payload, JWT_SECRET);
         return $payload . '.' . $signature;
     }
 
-    /** Returns the user_id encoded in a valid, unexpired token, or null otherwise. */
-    public static function verifyToken(?string $token): ?int
+    /**
+     * Returns ['sub' => user_id, 'role' => 'user'|'admin'] for a valid,
+     * unexpired token, or null otherwise. Prefer this over verifyToken()
+     * when you need the role, not just the id.
+     */
+    public static function verifyTokenFull(?string $token): ?array
     {
         if (!$token || !str_contains($token, '.')) {
             return null;
@@ -41,7 +49,17 @@ final class Auth
             return null; // expired
         }
 
-        return (int) $data['sub'];
+        return [
+            'sub'  => (int) $data['sub'],
+            'role' => $data['role'] ?? 'user', // tokens issued before roles existed default to 'user'
+        ];
+    }
+
+    /** Returns just the user_id encoded in a valid, unexpired token, or null otherwise. */
+    public static function verifyToken(?string $token): ?int
+    {
+        $data = self::verifyTokenFull($token);
+        return $data['sub'] ?? null;
     }
 
     private static function bearerToken(): ?string
@@ -68,6 +86,14 @@ final class Auth
         return null;
     }
 
+    private static function denyJson(int $status, string $message): never
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => $message]);
+        exit;
+    }
+
     /**
      * Call at the top of any endpoint that requires a logged-in user.
      * Returns the authenticated user_id, or halts the request with a 401
@@ -75,15 +101,31 @@ final class Auth
      */
     public static function requireAuth(): int
     {
-        $userId = self::verifyToken(self::bearerToken());
+        $data = self::verifyTokenFull(self::bearerToken());
 
-        if ($userId === null) {
-            http_response_code(401);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['success' => false, 'message' => 'กรุณาเข้าสู่ระบบก่อนใช้งาน']);
-            exit;
+        if ($data === null) {
+            self::denyJson(401, 'กรุณาเข้าสู่ระบบก่อนใช้งาน');
         }
 
-        return $userId;
+        return $data['sub'];
+    }
+
+    /**
+     * Call at the top of any endpoint that requires an admin. Returns the
+     * admin's own user_id, or halts with 401 (not logged in) / 403 (logged
+     * in but not an admin) JSON response.
+     */
+    public static function requireAdmin(): int
+    {
+        $data = self::verifyTokenFull(self::bearerToken());
+
+        if ($data === null) {
+            self::denyJson(401, 'กรุณาเข้าสู่ระบบก่อนใช้งาน');
+        }
+        if ($data['role'] !== 'admin') {
+            self::denyJson(403, 'ต้องใช้สิทธิ์ผู้ดูแลระบบสำหรับส่วนนี้');
+        }
+
+        return $data['sub'];
     }
 }
