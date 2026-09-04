@@ -20,7 +20,7 @@ define('ALLOWED_MIME_TYPES', ['image/jpeg', 'image/png', 'image/webp']);
 define('JWT_SECRET', getenv('JWT_SECRET') ?: 'CHANGE_ME_TO_A_LONG_RANDOM_SECRET');
 
 // CORS - restrict to your frontend origin(s) in production
-header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Origin: https://skinglow-eck.pages.dev');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
