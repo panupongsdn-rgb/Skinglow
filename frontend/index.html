@@ -45,6 +45,12 @@
   nav a{font-size:.85rem; margin-left:28px; text-decoration:none; color:var(--ink-soft);}
 
   .user-menu{display:flex; align-items:center; gap:12px;}
+  .admin-link{
+    font-size:.8rem; font-weight:700; color:var(--sage-deep); text-decoration:none;
+    border:1px solid var(--sage-deep); border-radius:999px; padding:6px 14px;
+    transition:background .15s ease, color .15s ease;
+  }
+  .admin-link:hover{background:var(--sage-deep); color:#fff;}
   .user-name{font-size:.85rem; color:var(--ink-soft); font-weight:600;}
   .logout-btn{
     display:flex; align-items:center; justify-content:center;
@@ -314,12 +320,13 @@
     <span class="logo-text">Skinglow</span>
   </div>
   <nav>
-    <a href="#" class="nav-link active" data-tab="scan">วิเคราะห์ผิว</a>
+    <a href="#" class="nav-link active" data-tab="scan">Skin Analysis</a>
     <a href="#" class="nav-link" data-tab="daily">Daily Insights</a>
     <a href="#" class="nav-link" data-tab="insight">Insight</a>
     <a href="#" class="nav-link" data-tab="compare">Compare My Skin</a>
   </nav>
   <div class="user-menu">
+    <a href="admin.html" id="adminLink" class="admin-link" style="display:none;">Admin Panel</a>
     <span class="user-name" id="userNameLabel"></span>
     <button type="button" class="logout-btn" id="logoutBtn" title="ออกจากระบบ">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -461,6 +468,9 @@ if (!AUTH_TOKEN || !CURRENT_USER) {
 document.addEventListener('DOMContentLoaded', () => {
   const nameLabel = document.getElementById('userNameLabel');
   if (nameLabel) nameLabel.textContent = CURRENT_USER.full_name || CURRENT_USER.email || '';
+
+  const adminLink = document.getElementById('adminLink');
+  if (adminLink && CURRENT_USER.role === 'admin') adminLink.style.display = 'inline-block';
 
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
