@@ -7,10 +7,10 @@ define('UPLOAD_ORIGINAL_DIR', BASE_PATH . '/uploads/original/');
 define('UPLOAD_PROCESSED_DIR', BASE_PATH . '/uploads/processed/');
 
 // Public URL used to build links returned to the frontend
-define('APP_BASE_URL', getenv('APP_BASE_URL') ?: 'http://localhost/skinglow/backend-php');
+define('APP_BASE_URL', getenv('APP_BASE_URL') ?: 'https://skinglowjourney.infinityfree.io/Skinglow/backend-php');
 
 // AI microservice endpoint (FastAPI / Python)
-define('AI_SERVICE_URL', getenv('AI_SERVICE_URL') ?: 'http://127.0.0.1:8000/analyze');
+define('AI_SERVICE_URL', getenv('AI_SERVICE_URL') ?: 'https://skinglow-ai-service.onrender.com/analyze');
 
 // Upload constraints
 define('MAX_UPLOAD_SIZE', 8 * 1024 * 1024); // 8 MB
