@@ -7,9 +7,9 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../src/Auth.php';
+require_once __DIR__ . 'https://skinglowjourney.infinityfree.io/Skinglow/backend-php/config/config.php';
+require_once __DIR__ . 'https://skinglowjourney.infinityfree.io/Skinglow/backend-php/config/database.php';
+require_once __DIR__ . 'https://skinglowjourney.infinityfree.io/Skinglow/backend-php/src/Auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
