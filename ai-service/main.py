@@ -318,6 +318,30 @@ def health_check():
     }
 
 
+# Phone/DSLR photos routinely come in at 3000-4000px on a side, which is far
+# more resolution than face-analysis needs and is a real OOM risk on a
+# resource-capped host (e.g. Render free tier: 0.1 CPU / 512MB RAM shared
+# with the loaded model weights). Downscale before any processing; detection
+# boxes are rescaled back to the ORIGINAL image's coordinate space before
+# returning, so the caller (PHP, drawing on the full-res original with GD)
+# never has to know this happened.
+MAX_PROCESSING_DIMENSION = 1280
+
+
+def resize_for_processing(pil_img: Image.Image):
+    """Returns (resized_image, scale_factor). scale_factor is how much the
+    image was shrunk (< 1.0 if resized, 1.0 if already small enough) — divide
+    detection box coordinates by this to map them back to the original size."""
+    width, height = pil_img.size
+    longest_side = max(width, height)
+    if longest_side <= MAX_PROCESSING_DIMENSION:
+        return pil_img, 1.0
+
+    scale = MAX_PROCESSING_DIMENSION / longest_side
+    new_size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    return pil_img.resize(new_size, Image.LANCZOS), scale
+
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(file: UploadFile = File(...)):
     if file.content_type not in ALLOWED_CONTENT_TYPES:
@@ -332,7 +356,8 @@ async def analyze(file: UploadFile = File(...)):
     except Exception:
         raise HTTPException(status_code=400, detail="Could not read image file.")
 
-    bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    processing_img, scale = resize_for_processing(pil_img)
+    bgr = cv2.cvtColor(np.array(processing_img), cv2.COLOR_RGB2BGR)
 
     try:
         if _available_count > 0:
@@ -349,5 +374,11 @@ async def analyze(file: UploadFile = File(...)):
                 raise HTTPException(status_code=422, detail=f"Analysis failed: {fallback_exc}")
         else:
             raise HTTPException(status_code=422, detail=f"Analysis failed: {exc}")
+
+    if scale != 1.0:
+        # map detection boxes from the downscaled processing image back to
+        # the original image's coordinate space
+        for detection in result.detections:
+            detection.box = [round(v / scale) for v in detection.box]
 
     return result
