@@ -5,16 +5,6 @@
  * Returns a signed token the frontend stores and sends as:
  *   Authorization: Bearer <token>
  */
-
-header('Access-Control-Allow-Origin: https://skinglow-eck.pages.dev');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
-
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/config.php';
@@ -34,7 +24,7 @@ $email    = trim((string)($input['email'] ?? ''));
 $password = (string)($input['password'] ?? '');
 
 $pdo = getDbConnection();
-$stmt = $pdo->prepare('SELECT id, full_name, email, password_hash FROM users WHERE email = :email AND is_active = 1');
+$stmt = $pdo->prepare('SELECT id, full_name, email, password_hash, role FROM users WHERE email = :email AND is_active = 1');
 $stmt->execute([':email' => $email]);
 $user = $stmt->fetch();
 
@@ -44,12 +34,15 @@ if (!$user || !password_verify($password, $user['password_hash'])) {
     exit;
 }
 
-$token = Auth::issueToken((int) $user['id']);
+$token = Auth::issueToken((int) $user['id'], $user['role']);
 
 echo json_encode([
     'success' => true,
     'data' => [
         'token' => $token,
-        'user'  => ['id' => $user['id'], 'full_name' => $user['full_name'], 'email' => $user['email']],
+        'user'  => ['id' => $user['id'], 
+                    'full_name' => $user['full_name'], 
+                    'email' => $user['email'], 
+                    'role' => $user['role']],
     ],
 ]);
