@@ -310,6 +310,338 @@
   @media (prefers-reduced-motion: reduce){
     .scan-ring, .scan-line{animation:none !important;}
   }
+
+  header{
+  position:sticky;
+  top:0;
+  z-index:1000;
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  background:rgba(251,248,253,.96);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+}
+/* Navigation */
+header nav{
+  flex:1;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+
+header nav a.nav-link{
+  margin-left:0;
+  white-space:nowrap;
+  padding:9px 13px;
+  border-radius:999px;
+  border-bottom:0;
+  transition:
+    background .2s ease,
+    color .2s ease;
+}
+header nav a.nav-link:hover{
+  background:var(--blush);
+}
+header nav a.nav-link.active{
+  background:var(--sage-deep);
+  color:#fff;
+  border-bottom:0;
+}
+/* User */
+.user-menu{
+  flex-shrink:0;
+}
+.user-name{
+  white-space:nowrap;
+}
+/* ---------- Main ---------- */
+main{
+  width:100%;
+}
+/* ---------- Compare image ---------- */
+.compare-card .cc-image{
+  width:100%;
+  /*
+     บังคับพื้นที่รูปให้เป็นแนวตั้ง
+     3:4
+  */
+  aspect-ratio:3 / 4;
+  height:auto;
+  object-fit:contain;
+  display:block;
+  background:var(--ivory);
+  padding:8px;
+}
+/* ---------- Result image ---------- */
+.result-image-wrap img{
+  width:100%;
+  height:auto;
+  object-fit:contain;
+  display:block;
+}
+/* =========================================================
+   TABLET
+   ========================================================= */
+@media (max-width:1024px){
+  header{
+    padding:20px 4vw;
+    gap:14px;
+  }
+  header nav{
+    gap:2px;
+  }
+  header nav a.nav-link{
+    font-size:.76rem;
+    padding:8px 10px;
+  }
+  .user-name{
+    max-width:100px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  main{
+    padding:5vw;
+  }
+  .hero{
+    gap:30px;
+  }
+  .results-grid{
+    gap:28px;
+  }
+}
+/* =========================================================
+   MOBILE
+   ========================================================= */
+@media (max-width:860px){
+  /* ---------------- Header ---------------- */
+  header{
+    display:grid;
+    grid-template-columns:1fr auto;
+    grid-template-areas:
+      "logo user"
+      "nav nav";
+    gap:12px;
+    padding:14px 16px;
+  }
+  .logo{
+    grid-area:logo;
+  }
+  .user-menu{
+    grid-area:user;
+  }
+
+  header nav{
+    grid-area:nav;
+    width:100%;
+    display:flex;
+    justify-content:flex-start;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding-bottom:4px;
+  }
+
+  header nav::-webkit-scrollbar{
+    display:none;
+  }
+
+  header nav a.nav-link{
+    flex:0 0 auto;
+    margin-left:0;
+    font-size:.74rem;
+    padding:9px 13px;
+    min-height:40px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .user-name{
+    display:none;
+  }
+  .admin-link{
+    display:none !important;
+  }
+  .logout-btn{
+    width:40px;
+    height:40px;
+  }
+  /* ---------------- Main ---------------- */
+  main{
+    padding:32px 16px 60px;
+  }
+  /* ---------------- Hero ---------------- */
+  .hero{
+    grid-template-columns:1fr;
+    gap:28px;
+    padding-bottom:36px;
+  }
+  .hero h1{
+    font-size:clamp(2rem,10vw,2.8rem);
+  }
+  .hero p{
+    font-size:.95rem;
+    line-height:1.75;
+  }
+  /* ---------------- Stats ---------------- */
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-top:24px;
+  }
+  .stat-num{
+    font-size:1.35rem;
+  }
+  .stat-label{
+    font-size:.68rem;
+    line-height:1.4;
+  }
+  /* ---------------- Scan ---------------- */
+  .scan-panel{
+    width:100%;
+    aspect-ratio:1 / 1;
+    border-radius:16px;
+  }
+  #preview-img,
+  #camera-video{
+    width:82%;
+    height:82%;
+  }
+  .btn-row{
+    width:100%;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .btn{
+    width:100%;
+    min-height:44px;
+    justify-content:center;
+    padding:10px 12px;
+  }
+  /* ---------------- Results ---------------- */
+  section#results{
+    padding:30px 0 60px;
+  }
+  .results-grid{
+    grid-template-columns:1fr;
+    gap:24px;
+  }
+  /* ---------------- Products ---------------- */
+  .products{
+    grid-template-columns:1fr;
+  }
+  /* ---------------- Chart ---------------- */
+  .chart-card{
+    padding:16px;
+    overflow-x:auto;
+  }
+  /* ---------------- History ---------------- */
+  .history-row{
+    gap:10px;
+    padding:10px;
+  }
+  .history-row .h-thumb{
+    width:46px;
+    height:46px;
+  }
+  .history-row .h-summary{
+    font-size:.78rem;
+  }
+  .history-row .h-score{
+    font-size:1rem;
+    min-width:35px;
+  }
+  /* ---------------- Compare ---------------- */
+  .compare-grid{
+    grid-template-columns:1fr;
+    gap:16px;
+  }
+  .compare-vs{
+    padding-top:0;
+    flex-direction:row;
+    justify-content:center;
+    min-height:40px;
+  }
+  .compare-vs .arrow{
+    transform:rotate(90deg);
+  }
+  .compare-card .cc-image{
+    width:100%;
+    aspect-ratio:3 / 4;
+    min-height:320px;
+    object-fit:contain;
+    padding:10px;
+  }
+  .compare-card .cc-body{
+    padding:16px;
+  }
+  /* ---------------- Panel ---------------- */
+  .panel-head{
+    margin-bottom:20px;
+  }
+  .panel-head h2{
+    font-size:1.45rem;
+  }
+  .panel-head p{
+    font-size:.84rem;
+    line-height:1.6;
+  }
+}
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+@media (max-width:480px){
+
+  header{
+    padding:12px;
+  }
+  .logo-text{
+    font-size:1.05rem;
+  }
+  .logo-mark{
+    width:26px;
+    height:26px;
+  }
+  header nav a.nav-link{
+    font-size:.68rem;
+    padding:8px 11px;
+  }
+  main{
+    padding:26px 12px 50px;
+  }
+  .hero h1{
+    font-size:2rem;
+  }
+  .hero p{
+    font-size:.88rem;
+  }
+  .stat-row{
+    gap:8px;
+  }
+  .stat-num{
+    font-size:1.15rem;
+  }
+  .stat-label{
+    font-size:.62rem;
+  }
+  .btn-row{
+    grid-template-columns:1fr;
+  }
+  .btn{
+    min-height:46px;
+  }
+  .compare-card .cc-image{
+    min-height:300px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -319,18 +651,18 @@
     <div class="logo-mark"></div>
     <span class="logo-text">Skinglow</span>
   </div>
-  <nav>
-    <a href="#" class="nav-link active" data-tab="scan">Skin Analysis</a>
-    <a href="#" class="nav-link" data-tab="daily">Daily Insights</a>
-    <a href="#" class="nav-link" data-tab="insight">Insight</a>
-    <a href="#" class="nav-link" data-tab="compare">Compare My Skin</a>
-  </nav>
-  <div class="user-menu">
-    <a href="admin.html" id="adminLink" class="admin-link" style="display:none;">Admin Panel</a>
-    <span class="user-name" id="userNameLabel"></span>
-    <button type="button" class="logout-btn" id="logoutBtn" title="ออกจากระบบ">
+    <nav>
+      <a href="#" class="nav-link active" data-tab="scan">Skin Analysis</a>
+      <a href="#" class="nav-link" data-tab="daily">Daily Insights</a>
+      <a href="#" class="nav-link" data-tab="insight">Insight</a>
+      <a href="#" class="nav-link" data-tab="compare">Compare My Skin</a>
+    </nav>
+    <div class="user-menu">
+      <a href="admin.html" id="adminLink" class="admin-link" style="display:none;">Admin Panel</a>
+      <span class="user-name" id="userNameLabel"></span>
+      <button type="button" class="logout-btn" id="logoutBtn" title="ออกจากระบบ">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
+      </button>
   </div>
 </header>
 
@@ -447,7 +779,7 @@
    Config — points at the real PHP/Python backend. Update these
    to match your deployment (see DEPLOY_STEPS.md).
 ------------------------------------------------------------- */
-const API_ANALYZE_URL = "https://skinglowjourney.infinityfree.io/Skinglow/backend-php/api/analyze.php"; // relative to frontend/index.html — works both at domain root and in a subfolder (e.g. XAMPP htdocs/skinglow/)
+const API_ANALYZE_URL = "../backend-php/api/analyze.php"; // relative to frontend/index.html — works both at domain root and in a subfolder (e.g. XAMPP htdocs/skinglow/)
 const LOGIN_PAGE_URL = "login.html";
 
 /* ------------------------------------------------------------
@@ -700,7 +1032,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
    SCAN HISTORY — real per-user data from the database (history.php),
    with a synthetic demo seed shown only until the user has real scans.
 ================================================================= */
-const HISTORY_URL = "https://skinglowjourney.infinityfree.io/Skinglow/backend-php/api/history.php";
+const HISTORY_URL = "../backend-php/api/history.php";
 const ISSUE_LABELS = ['acne', 'black_spot', 'eyebag', 'redness', 'oiliness', 'wrinkle'];
 let scanHistory = [];
 let usingRealHistory = false; // true once at least one real scan exists — hides the synthetic demo seed
