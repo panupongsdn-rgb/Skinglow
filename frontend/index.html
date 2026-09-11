@@ -251,6 +251,220 @@
   .history-row .h-score{
     font-family:'Fraunces',serif; font-size:1.15rem; color:var(--sage-deep); flex-shrink:0; min-width:44px; text-align:right;
   }
+/* =========================================================
+   HISTORY IMAGE VIEWER / ZOOM MODAL
+   ========================================================= */
+.history-row{
+  cursor:pointer;
+  transition:
+    transform .15s ease,
+    box-shadow .15s ease,
+    border-color .15s ease;
+}
+.history-row:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 22px -14px rgba(59,42,84,.35);
+  border-color:var(--blush-deep);
+}
+.history-row:active{
+  transform:scale(.995);
+}
+.history-row .h-thumb{
+  cursor:zoom-in;
+}
+/* ---------- Modal ---------- */
+.history-image-modal{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:rgba(25,18,35,.82);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.history-image-modal.open{
+  display:flex;
+}
+/* Popup */
+.history-modal-content{
+  position:relative;
+  width:min(92vw, 900px);
+  max-height:92vh;
+  background:var(--panel);
+  border:1px solid rgba(255,255,255,.25);
+  border-radius:20px;
+  box-shadow:0 25px 80px rgba(0,0,0,.35);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+/* ปุ่ม X */
+.history-modal-close{
+  position:absolute;
+  top:12px;
+  right:12px;
+  z-index:10;
+
+  width:40px;
+  height:40px;
+
+  border:none;
+  border-radius:50%;
+
+  background:rgba(59,42,84,.85);
+  color:#fff;
+
+  font-size:1.4rem;
+  line-height:1;
+  cursor:pointer;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  transition:
+    background .15s ease,
+    transform .15s ease;
+}
+.history-modal-close:hover{
+  background:var(--sage-deep);
+  transform:scale(1.05);
+}
+/* พื้นที่รูป */
+.history-modal-image-wrap{
+  position:relative;
+
+  width:100%;
+  height:min(68vh,700px);
+
+  background:#17131c;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  overflow:hidden;
+
+  touch-action:none;
+}
+/* รูปใหญ่ */
+#historyModalImage{
+  max-width:90%;
+  max-height:90%;
+  width:auto;
+  height:auto;
+  object-fit:contain;
+  transform-origin:center center;
+  user-select:none;
+  -webkit-user-drag:none;
+  cursor:grab;
+  transition:transform .15s ease;
+}
+#historyModalImage.dragging{
+  cursor:grabbing;
+  transition:none;
+}
+/* ---------- Zoom Controls ---------- */
+.history-zoom-controls{
+  position:absolute;
+  left:50%;
+  bottom:16px;
+  transform:translateX(-50%);
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px;
+  background:rgba(59,42,84,.9);
+  border-radius:999px;
+  box-shadow:0 8px 25px rgba(0,0,0,.25);
+}
+
+.history-zoom-btn{
+  width:38px;
+  height:38px;
+
+  border:none;
+  border-radius:50%;
+
+  background:rgba(255,255,255,.12);
+  color:#fff;
+
+  font-size:1.15rem;
+  cursor:pointer;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  transition:
+    background .15s ease,
+    transform .15s ease;
+}
+.history-zoom-btn:hover{
+  background:rgba(255,255,255,.25);
+  transform:scale(1.05);
+}
+.history-zoom-level{
+  min-width:58px;
+  text-align:center;
+  color:#fff;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;
+}
+.history-modal-info{
+  padding:16px 20px 18px;
+  border-top:1px solid var(--line);
+  background:var(--panel);
+}
+.history-modal-date{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;
+  color:var(--sage);
+  margin-bottom:5px;
+}
+.history-modal-summary{
+  font-size:.86rem;
+  color:var(--ink);
+  line-height:1.5;
+  padding-right:45px;
+}
+/* ---------- Mobile ---------- */
+@media (max-width:860px){
+  .history-image-modal{
+    padding:10px;
+  }
+  .history-modal-content{
+    width:96vw;
+    max-height:94vh;
+    border-radius:16px;
+  }
+  .history-modal-image-wrap{
+    height:70vh;
+  }
+  #historyModalImage{
+    max-width:94%;
+    max-height:88%;
+  }
+  .history-modal-close{
+    width:38px;
+    height:38px;
+    top:8px;
+    right:8px;
+  }
+  .history-modal-info{
+    padding:12px 14px 14px;
+  }
+  .history-modal-summary{
+    font-size:.78rem;
+  }
+  .history-zoom-controls{
+    bottom:10px;
+  }
+}
+
   .chart-legend{display:flex; flex-wrap:wrap; gap:14px; margin-bottom:18px;}
   .legend-item{display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
   .legend-dot{width:10px; height:10px; border-radius:3px; display:inline-block;}
@@ -822,6 +1036,83 @@ main{
   <div id="compareContent"></div>
 </div>
 </main>
+<!-- =========================================================
+     HISTORY IMAGE VIEWER
+     ========================================================= -->
+<div
+  id="historyImageModal"
+  class="history-image-modal"
+  aria-hidden="true"
+>
+  <div class="history-modal-content">
+    <!-- ปุ่มปิด -->
+    <button
+      type="button"
+      class="history-modal-close"
+      id="historyModalClose"
+      aria-label="ปิดรูปภาพ"
+    >
+      ×
+    </button>
+    <!-- พื้นที่รูป -->
+    <div
+      class="history-modal-image-wrap"
+      id="historyModalImageWrap"
+    >
+      <img
+        id="historyModalImage"
+        src=""
+        alt="ภาพผลการวิเคราะห์ผิว"
+        draggable="false"
+      >
+      <!-- ปุ่ม Zoom -->
+      <div class="history-zoom-controls">
+        <button
+          type="button"
+          class="history-zoom-btn"
+          id="historyZoomOut"
+          aria-label="ย่อรูป"
+        >
+          −
+        </button>
+        <span
+          class="history-zoom-level"
+          id="historyZoomLevel"
+        >
+          100%
+        </span>
+        <button
+          type="button"
+          class="history-zoom-btn"
+          id="historyZoomIn"
+          aria-label="ขยายรูป"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          class="history-zoom-btn"
+          id="historyZoomReset"
+          aria-label="คืนค่าขนาดรูป"
+          title="คืนค่าขนาดรูป"
+        >
+          ↻
+        </button>
+      </div>
+    </div>
+    <!-- ข้อมูลของรายการ -->
+    <div class="history-modal-info">
+      <div
+        class="history-modal-date"
+        id="historyModalDate"
+      ></div>
+      <div
+        class="history-modal-summary"
+        id="historyModalSummary"
+      ></div>
+    </div>
+  </div>
+</div>
 
 <footer>© 2026 Skinglow — AI Skin Analysis &amp; Skincare Recommendation</footer>
 <script>
@@ -1251,33 +1542,95 @@ initScanHistory();
 ================================================================= */
 /** Per-entry list of past analyses (thumbnail + date + score + summary),
  *  shown under the chart. Newest first. */
+
 function renderHistoryList() {
   const wrap = document.getElementById('historyListWrap');
   if (!wrap) return;
 
-  const entries = [...scanHistory].reverse(); // newest first for the list view
+  const entries = [...scanHistory].reverse(); // newest first
 
   if (entries.length === 0) {
-    wrap.innerHTML = `<div class="empty-state"><p>ยังไม่มีประวัติการวิเคราะห์</p></div>`;
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <p>ยังไม่มีประวัติการวิเคราะห์</p>
+      </div>`;
     return;
   }
+  wrap.innerHTML = `
+    <div class="history-list">
+      ${entries.map((e, index) => {
+        const dateStr = e.isReal
+          ? e.date.toLocaleDateString('th-TH', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          : `${e.label} (ตัวอย่าง)`;
+        const scoreStr =
+          (e.skin_score !== null &&
+           e.skin_score !== undefined)
+            ? Math.round(e.skin_score)
+            : '—';
+        const summary = summaryFromCounts(e.counts);
+        return `
+          <div
+            class="history-row"
+            data-history-index="${index}"
+            tabindex="0"
+            role="button"
+            aria-label="ดูภาพผลการวิเคราะห์ ${dateStr}"
+          >
+            <img
+              class="h-thumb"
+              src="${e.image}"
+              alt="ภาพผลการวิเคราะห์"
+              loading="lazy"
+            >
+            <div class="h-main">
+              <div class="h-date">
+                ${dateStr}
+              </div>
+              <div class="h-summary">
+                ${summary}
+              </div>
+            </div>
+            <div class="h-score">
+              ${scoreStr}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+  /* ----------------------------------------------------------
+     Click / Touch history row
+  ----------------------------------------------------------- */
+  wrap.querySelectorAll('.history-row').forEach(row => {
 
-  wrap.innerHTML = `<div class="history-list">` + entries.map(e => {
-    const dateStr = e.isReal
-      ? e.date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : `${e.label} (ตัวอย่าง)`;
-    const scoreStr = (e.skin_score !== null && e.skin_score !== undefined) ? Math.round(e.skin_score) : '—';
-    return `
-      <div class="history-row">
-        <img class="h-thumb" src="${e.image}" alt="">
-        <div class="h-main">
-          <div class="h-date">${dateStr}</div>
-          <div class="h-summary">${summaryFromCounts(e.counts)}</div>
-        </div>
-        <div class="h-score">${scoreStr}</div>
-      </div>
-    `;
-  }).join('') + `</div>`;
+    row.addEventListener('click', () => {
+
+      const index = Number(row.dataset.historyIndex);
+
+      const entry = entries[index];
+
+      if (!entry) return;
+
+      openHistoryImageModal(entry);
+    });
+
+    /* รองรับ keyboard เช่น Enter / Space */
+    row.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+      event.preventDefault();
+      const index = Number(row.dataset.historyIndex);
+      const entry = entries[index];
+      if (!entry) return;
+      openHistoryImageModal(entry);
+    });
+
+  });
 }
 
 function summaryFromCounts(counts) {
@@ -1607,6 +1960,296 @@ function renderDailyInsights() {
 
 // render the daily tab once up front so it's populated even before first click
 renderDailyInsights();
+
+/* ================================================================
+   HISTORY IMAGE MODAL + ZOOM
+================================================================= */
+const historyImageModal =
+  document.getElementById('historyImageModal');
+const historyModalImage =
+  document.getElementById('historyModalImage');
+const historyModalClose =
+  document.getElementById('historyModalClose');
+const historyModalImageWrap =
+  document.getElementById('historyModalImageWrap');
+const historyZoomIn =
+  document.getElementById('historyZoomIn');
+const historyZoomOut =
+  document.getElementById('historyZoomOut');
+const historyZoomReset =
+  document.getElementById('historyZoomReset');
+const historyZoomLevel =
+  document.getElementById('historyZoomLevel');
+const historyModalDate =
+  document.getElementById('historyModalDate');
+const historyModalSummary =
+  document.getElementById('historyModalSummary');
+/* ---------------------------------------------------------------
+   Zoom state
+---------------------------------------------------------------- */
+let historyZoom = 1;
+const HISTORY_ZOOM_MIN = 0.5;
+const HISTORY_ZOOM_MAX = 4;
+const HISTORY_ZOOM_STEP = 0.25;
+/* ---------------------------------------------------------------
+   Pan state
+---------------------------------------------------------------- */
+let historyPanX = 0;
+let historyPanY = 0;
+let historyDragging = false;
+let historyDragStartX = 0;
+let historyDragStartY = 0;
+let historyStartPanX = 0;
+let historyStartPanY = 0;
+/* ---------------------------------------------------------------
+   Update image transform
+---------------------------------------------------------------- */
+function updateHistoryImageTransform() {
+  historyModalImage.style.transform =
+    `translate(${historyPanX}px, ${historyPanY}px) scale(${historyZoom})`;
+  historyZoomLevel.textContent =
+    `${Math.round(historyZoom * 100)}%`;
+}
+/* ---------------------------------------------------------------
+   Reset zoom / position
+---------------------------------------------------------------- */
+function resetHistoryImageZoom() {
+  historyZoom = 1;
+  historyPanX = 0;
+  historyPanY = 0;
+  updateHistoryImageTransform();
+}
+/* ---------------------------------------------------------------
+   Open modal
+---------------------------------------------------------------- */
+function openHistoryImageModal(entry) {
+  if (!entry || !entry.image) {
+    return;
+  }
+  historyModalImage.src = entry.image;
+  const dateStr = entry.isReal
+    ? entry.date.toLocaleDateString('th-TH', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : `${entry.label} (ตัวอย่าง)`;
+  const scoreStr =
+    (entry.skin_score !== null &&
+     entry.skin_score !== undefined)
+      ? Math.round(entry.skin_score)
+      : '—';
+  historyModalDate.textContent =
+    `${dateStr} • คะแนนผิว ${scoreStr}`;
+  historyModalSummary.textContent =
+    summaryFromCounts(entry.counts);
+  resetHistoryImageZoom();
+  historyImageModal.classList.add('open');
+  historyImageModal.setAttribute(
+    'aria-hidden',
+    'false'
+  );
+  /* ป้องกันหน้าเว็บด้านหลังเลื่อน */
+  document.body.style.overflow = 'hidden';
+}
+/* ---------------------------------------------------------------
+   Close modal
+---------------------------------------------------------------- */
+function closeHistoryImageModal() {
+  historyImageModal.classList.remove('open');
+  historyImageModal.setAttribute(
+    'aria-hidden',
+    'true'
+  );
+  document.body.style.overflow = '';
+  resetHistoryImageZoom();
+  /* ล้าง src หลังปิด */
+  setTimeout(() => {
+    if (!historyImageModal.classList.contains('open')) {
+      historyModalImage.src = '';
+    }
+  }, 150);
+}
+/* ---------------------------------------------------------------
+   Zoom in
+---------------------------------------------------------------- */
+historyZoomIn.addEventListener('click', (event) => {
+  event.stopPropagation();
+  historyZoom = Math.min(
+    HISTORY_ZOOM_MAX,
+    historyZoom + HISTORY_ZOOM_STEP
+  );
+  updateHistoryImageTransform();
+});
+/* ---------------------------------------------------------------
+   Zoom out
+---------------------------------------------------------------- */
+historyZoomOut.addEventListener('click', (event) => {
+  event.stopPropagation();
+  historyZoom = Math.max(
+    HISTORY_ZOOM_MIN,
+    historyZoom - HISTORY_ZOOM_STEP
+  );
+  /* ถ้าซูมออกถึง 100% ให้คืนตำแหน่ง */
+  if (historyZoom <= 1) {
+    historyPanX = 0;
+    historyPanY = 0;
+  }
+  updateHistoryImageTransform();
+});
+/* ---------------------------------------------------------------
+   Reset zoom
+---------------------------------------------------------------- */
+historyZoomReset.addEventListener('click', (event) => {
+  event.stopPropagation();
+  resetHistoryImageZoom();
+});
+/* ---------------------------------------------------------------
+   Close button
+---------------------------------------------------------------- */
+historyModalClose.addEventListener(
+  'click',
+  closeHistoryImageModal
+);
+/* ---------------------------------------------------------------
+   Click outside image / content to close
+---------------------------------------------------------------- */
+historyImageModal.addEventListener('click', (event) => {
+  if (event.target === historyImageModal) {
+    closeHistoryImageModal();
+  }
+});
+/* ---------------------------------------------------------------
+   ESC to close
+---------------------------------------------------------------- */
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' &&
+      historyImageModal.classList.contains('open')) {
+    closeHistoryImageModal();
+  }
+});
+/* ================================================================
+   MOUSE WHEEL ZOOM
+================================================================= */
+historyModalImageWrap.addEventListener(
+  'wheel',
+  (event) => {
+
+    if (!historyImageModal.classList.contains('open')) {
+      return;
+    }
+    event.preventDefault();
+    if (event.deltaY < 0) {
+      historyZoom = Math.min(
+        HISTORY_ZOOM_MAX,
+        historyZoom + HISTORY_ZOOM_STEP
+      );
+    } else {
+      historyZoom = Math.max(
+        HISTORY_ZOOM_MIN,
+        historyZoom - HISTORY_ZOOM_STEP
+      );
+      if (historyZoom <= 1) {
+        historyPanX = 0;
+        historyPanY = 0;
+      }
+    }
+    updateHistoryImageTransform();
+  },
+  { passive: false }
+);
+/* ================================================================
+   DRAG IMAGE WHEN ZOOMED
+================================================================= */
+/* Mouse down */
+historyModalImage.addEventListener(
+  'mousedown',
+  (event) => {
+
+    if (historyZoom <= 1) {
+      return;
+    }
+    event.preventDefault();
+    historyDragging = true;
+    historyModalImage.classList.add('dragging');
+    historyDragStartX = event.clientX;
+    historyDragStartY = event.clientY;
+    historyStartPanX = historyPanX;
+    historyStartPanY = historyPanY;
+  }
+);
+/* Mouse move */
+document.addEventListener(
+  'mousemove',
+  (event) => {
+
+    if (!historyDragging) {
+      return;
+    }
+    historyPanX =
+      historyStartPanX +
+      (event.clientX - historyDragStartX);
+
+    historyPanY =
+      historyStartPanY +
+      (event.clientY - historyDragStartY);
+    updateHistoryImageTransform();
+  }
+);
+/* Mouse up */
+document.addEventListener(
+  'mouseup',
+  () => {
+    historyDragging = false;
+    historyModalImage.classList.remove('dragging');
+  }
+);
+/* ================================================================
+   TOUCH / MOBILE DRAG
+================================================================= */
+historyModalImage.addEventListener(
+  'touchstart',
+  (event) => {
+
+    if (historyZoom <= 1) {
+      return;
+    }
+    const touch = event.touches[0];
+    historyDragging = true;
+    historyDragStartX = touch.clientX;
+    historyDragStartY = touch.clientY;
+    historyStartPanX = historyPanX;
+    historyStartPanY = historyPanY;
+  },
+  { passive: true }
+);
+historyModalImage.addEventListener(
+  'touchmove',
+  (event) => {
+
+    if (!historyDragging || historyZoom <= 1) {
+      return;
+    }
+    const touch = event.touches[0];
+    historyPanX =
+      historyStartPanX +
+      (touch.clientX - historyDragStartX);
+    historyPanY =
+      historyStartPanY +
+      (touch.clientY - historyDragStartY);
+    updateHistoryImageTransform();
+    event.preventDefault();
+  },
+  { passive: false }
+);
+historyModalImage.addEventListener(
+  'touchend',
+  () => {
+    historyDragging = false;
+  }
+);
 
 </script>
 </body>
