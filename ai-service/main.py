@@ -280,16 +280,53 @@ def analyze_face(bgr: np.ndarray) -> AnalyzeResponse:
     )
 
 
+def filter_detections_to_face(detections: List[Detection], bgr: np.ndarray, margin: float = 0.25) -> List[Detection]:
+    """Drops detections whose center falls outside the face region (plus a
+    margin for forehead/jaw/cheek-edge conditions like wrinkles or eyebags
+    that legitimately sit near the face boundary).
+
+    WHY THIS IS NEEDED: the trained YOLO model runs on the *entire* image
+    with no built-in concept of "only look at the face" — it was never
+    given that spatial constraint at inference time, so visually similar
+    textures in hair, ears, or background clutter can trigger false
+    detections there. This matches the high background false-positive
+    rates already seen in this model's confusion matrix (e.g. Wrinkle
+    FP=546, Black Spot FP=415 on true background) — those weren't only
+    happening on skin-colored background, they include hair/ear regions
+    too, which this filter directly targets.
+
+    This is a fast, no-retraining mitigation. It does NOT fix detections
+    that land on hair/ears that happen to overlap the expanded face
+    region, or fix the model's underlying confidence calibration — see
+    ai-service/train/README.md for the real fix (better/more consistent
+    training data, ideally with hard-negative background images).
+    """
+    fx, fy, fw, fh = locate_face(bgr)
+    mx, my = int(fw * margin), int(fh * margin)
+    x0, y0 = fx - mx, fy - my
+    x1, y1 = fx + fw + mx, fy + fh + my
+
+    kept = []
+    for d in detections:
+        bx0, by0, bx1, by1 = d.box
+        cx, cy = (bx0 + bx1) / 2, (by0 + by1) / 2
+        if x0 <= cx <= x1 and y0 <= cy <= y1:
+            kept.append(d)
+    return kept
+
+
 def analyze_face_ml(bgr: np.ndarray) -> AnalyzeResponse:
     """Run whatever trained model(s) are loaded, via ensemble.py. With a
     single model this is a passthrough (WBF over one input is a no-op);
     with 2+ models it fuses their outputs with Weighted Boxes Fusion."""
     raw_detections = ensemble.ensemble_predict(bgr, ENSEMBLE_MEMBERS, conf=CLEAR_CONFIDENCE_THRESHOLD)
 
-    detections = [
+    all_detections = [
         Detection(box=d["box"], label=d["label"], confidence=d["confidence"])
         for d in raw_detections
-    ][:12]
+    ]
+    detections = filter_detections_to_face(all_detections, bgr)
+    detections = sorted(detections, key=lambda d: d.confidence, reverse=True)[:12]
 
     penalty = sum(d.confidence for d in detections) * 6
     skin_score = round(max(0.0, 100 - penalty), 1)
