@@ -32,7 +32,7 @@ Run:
 
 import io
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import cv2
 import numpy as np
@@ -125,18 +125,25 @@ def face_present(bgr: np.ndarray) -> bool:
 # ----------------------------------------------------------------------
 # Face localization
 # ----------------------------------------------------------------------
-def locate_face(bgr: np.ndarray) -> Tuple[int, int, int, int]:
-    """Returns (x, y, w, h) of the largest detected face, or a centered
-    fallback region if no face is found (e.g. a close-up crop)."""
+def locate_face(
+    bgr: np.ndarray
+) -> Optional[Tuple[int, int, int, int]]:
+
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(80, 80))
+
+    faces = FACE_CASCADE.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(80, 80)
+    )
 
     if len(faces) == 0:
-        h, w = bgr.shape[:2]
-        fw, fh = int(w * 0.7), int(h * 0.8)
-        return ((w - fw) // 2, (h - fh) // 2, fw, fh)
+        return None
 
-    return tuple(max(faces, key=lambda f: f[2] * f[3]))
+    return tuple(
+        max(faces, key=lambda f: f[2] * f[3])
+    )
 
 
 def locate_eyes(gray_face: np.ndarray) -> List[Tuple[int, int, int, int]]:
