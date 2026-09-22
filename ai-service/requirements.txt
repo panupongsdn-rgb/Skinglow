@@ -21,3 +21,4 @@ numpy==1.26.4
 # instead of relying on this file alone — see render.yaml in this repo.
 ultralytics==8.2.103
 ensemble-boxes==1.0.9
+mediapipe==0.10.21
