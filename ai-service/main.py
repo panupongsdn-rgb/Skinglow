@@ -294,27 +294,22 @@ def analyze_face(bgr: np.ndarray) -> AnalyzeResponse:
         skin_score=skin_score, detections=detections, model_type="heuristic_cv_v2",
         face_detected=found, skin_status=status,
     )
-def create_strict_face_region(
-    bgr: np.ndarray,
-):
+def create_strict_face_region(bgr: np.ndarray):
     """
-    Detect the actual face contour using MediaPipe Face Mesh.
+    Create a strict facial ROI using MediaPipe Face Mesh.
 
     Returns:
-        None if no face is detected.
-
-        Otherwise:
-            masked_face
-            face_mask
-            (face_x, face_y, face_w, face_h)
-
-    The YOLO model receives only the face region.
-    Pixels outside the facial contour are removed.
+        masked_face
+        face_mask
+        face_box
     """
 
     image_height, image_width = bgr.shape[:2]
 
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    rgb = cv2.cvtColor(
+        bgr,
+        cv2.COLOR_BGR2RGB
+    )
 
     result = FACE_MESH.process(rgb)
 
@@ -326,107 +321,133 @@ def create_strict_face_region(
     points = []
 
     for index in FACE_OVAL_INDICES:
+
         landmark = landmarks[index]
 
         x = int(landmark.x * image_width)
         y = int(landmark.y * image_height)
 
-        x = max(0, min(x, image_width - 1))
-        y = max(0, min(y, image_height - 1))
+        x = max(
+            0,
+            min(x, image_width - 1)
+        )
+
+        y = max(
+            0,
+            min(y, image_height - 1)
+        )
 
         points.append([x, y])
 
-    points = np.asarray(points, dtype=np.int32)
+    points = np.asarray(
+        points,
+        dtype=np.int32
+    )
 
     if len(points) < 3:
         return None
 
-    # Create exact face contour
     face_hull = cv2.convexHull(points)
 
     face_mask = np.zeros(
         (image_height, image_width),
-        dtype=np.uint8,
+        dtype=np.uint8
     )
 
     cv2.fillConvexPoly(
         face_mask,
         face_hull,
-        255,
+        255
     )
 
-    # Bounding rectangle around the actual face
-    x, y, w, h = cv2.boundingRect(face_hull)
+    x, y, w, h = cv2.boundingRect(
+        face_hull
+    )
 
     face_crop = bgr[
-        y:y + h,
-        x:x + w,
+        y:y+h,
+        x:x+w
     ]
 
     crop_mask = face_mask[
-        y:y + h,
-        x:x + w,
+        y:y+h,
+        x:x+w
     ]
 
-    # Remove everything outside the face contour
     masked_face = cv2.bitwise_and(
         face_crop,
         face_crop,
-        mask=crop_mask,
+        mask=crop_mask
     )
 
     return (
         masked_face,
         crop_mask,
-        (x, y, w, h),
+        (x, y, w, h)
     )
 
 def calculate_mask_overlap(
     mask: np.ndarray,
-    box: List[int],
+    box: List[int]
 ) -> float:
-    """
-    Calculate how much of a detection bounding box
-    actually lies inside the face mask.
-    """
 
     image_height, image_width = mask.shape
 
     x1, y1, x2, y2 = box
 
-    x1 = max(0, min(x1, image_width - 1))
-    y1 = max(0, min(y1, image_height - 1))
+    x1 = max(
+        0,
+        min(x1, image_width - 1)
+    )
 
-    x2 = max(x1 + 1, min(x2, image_width))
-    y2 = max(y1 + 1, min(y2, image_height))
+    y1 = max(
+        0,
+        min(y1, image_height - 1)
+    )
 
-    box_mask = mask[y1:y2, x1:x2]
+    x2 = max(
+        x1 + 1,
+        min(x2, image_width)
+    )
 
-    box_area = (x2 - x1) * (y2 - y1)
+    y2 = max(
+        y1 + 1,
+        min(y2, image_height)
+    )
+
+    box_mask = mask[
+        y1:y2,
+        x1:x2
+    ]
+
+    box_area = (
+        (x2 - x1) *
+        (y2 - y1)
+    )
 
     if box_area <= 0:
         return 0.0
 
-    face_pixels = cv2.countNonZero(box_mask)
+    face_pixels = cv2.countNonZero(
+        box_mask
+    )
 
     return face_pixels / box_area
 
+def analyze_face_ml(
+    bgr: np.ndarray
+) -> AnalyzeResponse:
 
-def analyze_face_ml(bgr: np.ndarray) -> AnalyzeResponse:
-    """
-    Strict face-only YOLO inference.
-    Pipeline:
-        1. Detect face using MediaPipe Face Mesh.
-        2. Crop to the actual face region.
-        3. Mask everything outside the face.
-        4. Run YOLO only on the masked face.
-        5. Verify every detection against the face mask.
-    """
-    face_region = create_strict_face_region(bgr)
-    # --------------------------------------------------------------
-    # No face detected
-    # --------------------------------------------------------------
+    # ==========================================================
+    # 1. Detect actual face
+    # ==========================================================
+
+    face_region = create_strict_face_region(
+        bgr
+    )
+
     if face_region is None:
+
         return AnalyzeResponse(
             skin_score=100.0,
             detections=[],
@@ -434,108 +455,180 @@ def analyze_face_ml(bgr: np.ndarray) -> AnalyzeResponse:
             face_detected=False,
             skin_status="no_face_detected",
         )
-    masked_face, face_mask, face_box = face_region
+
+    (
+        masked_face,
+        face_mask,
+        face_box
+    ) = face_region
+
     face_x, face_y, face_w, face_h = face_box
-    # --------------------------------------------------------------
-    # Run YOLO ONLY on the face crop
-    # --------------------------------------------------------------
+
+
+    # ==========================================================
+    # 2. Run YOLO ONLY on face ROI
+    # ==========================================================
+
     raw_detections = ensemble.ensemble_predict(
         masked_face,
         ENSEMBLE_MEMBERS,
         conf=CLEAR_CONFIDENCE_THRESHOLD,
     )
+
+
     detections = []
+
+
+    # ==========================================================
+    # 3. Strictly validate every detection
+    # ==========================================================
+
     for raw in raw_detections:
-        local_box = raw["box"]
-        local_x1, local_y1, local_x2, local_y2 = local_box
-        # ----------------------------------------------------------
-        # Clamp local coordinates
-        # ----------------------------------------------------------
-        local_x1 = max(0, min(local_x1, face_w - 1))
-        local_y1 = max(0, min(local_y1, face_h - 1))
-        local_x2 = max(
-            local_x1 + 1,
-            min(local_x2, face_w),
+
+        x1, y1, x2, y2 = raw["box"]
+
+
+        # ------------------------------------------------------
+        # Clamp coordinates
+        # ------------------------------------------------------
+
+        x1 = max(
+            0,
+            min(x1, face_w - 1)
         )
-        local_y2 = max(
-            local_y1 + 1,
-            min(local_y2, face_h),
+
+        y1 = max(
+            0,
+            min(y1, face_h - 1)
         )
+
+        x2 = max(
+            x1 + 1,
+            min(x2, face_w)
+        )
+
+        y2 = max(
+            y1 + 1,
+            min(y2, face_h)
+        )
+
+
         local_box = [
-            local_x1,
-            local_y1,
-            local_x2,
-            local_y2,
+            x1,
+            y1,
+            x2,
+            y2
         ]
-        # ----------------------------------------------------------
-        # Require detection center to be inside face
-        # ----------------------------------------------------------
-        center_x = int((local_x1 + local_x2) / 2)
-        center_y = int((local_y1 + local_y2) / 2)
+
+
+        # ------------------------------------------------------
+        # 4. Check CENTER
+        # ------------------------------------------------------
+
+        center_x = int(
+            (x1 + x2) / 2
+        )
+
+        center_y = int(
+            (y1 + y2) / 2
+        )
+
+
         if (
             center_x < 0
             or center_y < 0
-            or center_y >= face_mask.shape[0]
             or center_x >= face_mask.shape[1]
+            or center_y >= face_mask.shape[0]
         ):
             continue
-        if face_mask[center_y, center_x] == 0:
+
+
+        if face_mask[
+            center_y,
+            center_x
+        ] == 0:
             continue
-        # ----------------------------------------------------------
-        # Require most of bounding box to be inside face
-        # ----------------------------------------------------------
+
+
+        # ------------------------------------------------------
+        # 5. Check FACE MASK OVERLAP
+        # ------------------------------------------------------
+
         overlap = calculate_mask_overlap(
             face_mask,
-            local_box,
+            local_box
         )
-        # Strict threshold
-        if overlap < 0.80:
+
+
+        # ต้องอยู่ในหน้าอย่างน้อย 90%
+        if overlap < 0.90:
             continue
-        # ----------------------------------------------------------
-        # Convert local face coordinates
-        # back to original image coordinates
-        # ----------------------------------------------------------
+
+
+        # ------------------------------------------------------
+        # 6. Convert back to original image coordinates
+        # ------------------------------------------------------
+
         global_box = [
-            int(local_x1 + face_x),
-            int(local_y1 + face_y),
-            int(local_x2 + face_x),
-            int(local_y2 + face_y),
+            int(x1 + face_x),
+            int(y1 + face_y),
+            int(x2 + face_x),
+            int(y2 + face_y)
         ]
+
+
         detections.append(
             Detection(
                 box=global_box,
                 label=raw["label"],
-                confidence=raw["confidence"],
+                confidence=raw["confidence"]
             )
         )
-    # --------------------------------------------------------------
-    # Sort detections
-    # --------------------------------------------------------------
+
+
+    # ==========================================================
+    # 7. Sort detections
+    # ==========================================================
+
     detections = sorted(
         detections,
         key=lambda d: d.confidence,
-        reverse=True,
+        reverse=True
     )[:12]
-    # --------------------------------------------------------------
-    # Skin score
-    # --------------------------------------------------------------
+
+
+    # ==========================================================
+    # 8. Skin score
+    # ==========================================================
+
     penalty = sum(
         d.confidence
         for d in detections
     ) * 6
+
     skin_score = round(
-        max(0.0, 100 - penalty),
-        1,
+        max(
+            0.0,
+            100 - penalty
+        ),
+        1
     )
+
+
     status = determine_skin_status(
         True,
-        detections,
+        detections
     )
+
+
     if status == "clear":
+
         skin_score = max(
             skin_score,
-            90.0,
+            90.0
         )
+
+
     return AnalyzeResponse(
         skin_score=skin_score,
         detections=detections,
