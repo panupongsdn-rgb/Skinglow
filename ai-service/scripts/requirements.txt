@@ -7,3 +7,6 @@ pyyaml==6.0.1
 imagehash==4.3.1
 numpy==1.26.4
 ultralytics==8.2.103
+
+# needed by generate_hard_negatives.py
+opencv-python-headless==4.10.0.84
