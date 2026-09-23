@@ -95,6 +95,16 @@ else:
 
 print(f"[startup] {_available_count} model(s) loaded -> model_type={MODEL_TYPE}")
 
+# Warm-up: the FIRST YOLO call after startup is ~20x slower than later calls
+# (layer fusing, allocator setup). Doing it here, during startup, means the
+# first real user doesn't pay that cost inside PHP's 30 s timeout.
+if _available_count > 0:
+    try:
+        ensemble.ensemble_predict(np.zeros((320, 320, 3), dtype=np.uint8), ENSEMBLE_MEMBERS, conf=0.5)
+        print("[startup] YOLO warm-up done")
+    except Exception as _exc:
+        print(f"[startup] YOLO warm-up skipped: {_exc!r}")
+
 
 class Detection(BaseModel):
     box: List[int]          # [x_min, y_min, x_max, y_max]
@@ -114,7 +124,10 @@ class AnalyzeResponse(BaseModel):
 # count toward "issues found" — same value used at inference time in
 # YOLO_MODEL.predict(conf=...) below, kept as one constant so the two
 # stay in sync.
-CLEAR_CONFIDENCE_THRESHOLD = 0.35
+# Minimum confidence for a detection to count. Adjustable WITHOUT a code change:
+# Render -> Environment -> DETECTION_CONFIDENCE (e.g. 0.25). Best value = the
+# confidence at the peak of this model's F1 curve (runs/detect/train/F1_curve.png).
+CLEAR_CONFIDENCE_THRESHOLD = float(os.getenv("DETECTION_CONFIDENCE", "0.35"))
 
 
 def determine_skin_status(face_found: bool, detections: List[Detection]) -> str:
