@@ -698,7 +698,12 @@ async def analyze(file: UploadFile = File(...)):
             result = analyze_face(bgr)
     except Exception as exc:
         # if the trained model(s) error on a specific image, fall back to
-        # the heuristic rather than failing the request outright
+        # the heuristic rather than failing the request outright — but LOG
+        # it: a silent fallback previously made the heuristic's output look
+        # like the trained model's (see Render logs for this line).
+        import traceback
+        print(f"[analyze] trained-model path FAILED, falling back to heuristic: {exc!r}")
+        traceback.print_exc()
         if _available_count > 0:
             try:
                 result = analyze_face(bgr)

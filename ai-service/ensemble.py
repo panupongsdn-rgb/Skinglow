@@ -122,10 +122,47 @@ def load_ensemble() -> List[EnsembleMember]:
         member = EnsembleMember(cfg["file"], cfg["weight"], cfg["label_map"])
         if member.available:
             print(f"[ensemble] loaded {cfg['file']} — classes: {member.model.names}")
+            unmapped = [n for n in member.model.names.values() if resolve_label(member, n) is None]
+            if unmapped:
+                print(f"[ensemble] WARNING {cfg['file']}: these classes will be IGNORED "
+                      f"(no mapping to {CANONICAL_LABELS}): {unmapped}")
         else:
             print(f"[ensemble] SKIPPED {cfg['file']}: {member.load_error}")
         members.append(member)
     return members
+
+
+# Spelling variants seen across datasets/retrains, mapped to canonical labels.
+# e.g. the original FarmasiSkinCare export used "Oilness"/"Black Spot", while a
+# model retrained later emits "oiliness"/"black_spot".
+NAME_ALIASES = {
+    "oilness": "oiliness",
+    "oily": "oiliness",
+    "oily_skin": "oiliness",
+    "blackspot": "black_spot",
+    "dark_spot": "black_spot",
+    "dark_spots": "black_spot",
+    "eye_bag": "eyebag",
+    "eyebags": "eyebag",
+    "skin_redness": "redness",
+    "wrinkles": "wrinkle",
+}
+
+
+def normalize_label(raw_name: str):
+    """'Black Spot' / 'black-spot' / 'BLACK_SPOT' -> 'black_spot'; returns a
+    canonical label or None if it isn't part of this project's taxonomy."""
+    key = str(raw_name).strip().lower().replace(" ", "_").replace("-", "_")
+    key = NAME_ALIASES.get(key, key)
+    return key if key in LABEL_TO_IDX else None
+
+
+def resolve_label(member: "EnsembleMember", raw_name: str):
+    """Explicit label_map entry wins (including an explicit None = drop);
+    otherwise fall back to normalized matching."""
+    if raw_name in member.label_map:
+        return member.label_map[raw_name]
+    return normalize_label(raw_name)
 
 
 def _predict_one(member: EnsembleMember, bgr: np.ndarray, conf: float, img_w: int, img_h: int):
@@ -136,7 +173,7 @@ def _predict_one(member: EnsembleMember, bgr: np.ndarray, conf: float, img_w: in
     boxes, scores, labels = [], [], []
     for box in results.boxes:
         raw_name = member.model.names[int(box.cls[0])]
-        canonical = member.label_map.get(raw_name)
+        canonical = resolve_label(member, raw_name)
         if canonical is None:
             continue  # class not in our taxonomy, or explicitly dropped
         if canonical not in LABEL_TO_IDX:

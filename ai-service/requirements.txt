@@ -14,11 +14,11 @@ numpy==1.26.4
 # so pip doesn't re-resolve the large CUDA build:
 #
 #   pip install torch --index-url https://download.pytorch.org/whl/cpu
-#   pip install ultralytics==8.2.103
+#   pip install ultralytics==8.4.118
 #
 # If your host's build step only reads this file directly (`pip install -r
 # requirements.txt`), keep the two-step install above in your build command
 # instead of relying on this file alone — see render.yaml in this repo.
-ultralytics==8.2.103
+ultralytics==8.4.118  # must match the version used for training (recorded inside the .pt)
 ensemble-boxes==1.0.9
 mediapipe==0.10.21
