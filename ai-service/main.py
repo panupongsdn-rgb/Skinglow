@@ -30,18 +30,35 @@ Run:
     uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
-import io
 import os
+
+# Render's free instance gets ~0.1 CPU, but PyTorch/OpenMP see every core of
+# the host machine and start that many threads, which then fight over the
+# tiny CPU quota. One thread each is the right setting for this instance.
+# (Must run before numpy / cv2 / torch are imported.)
+for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
+import io
+import threading
 from typing import List, Tuple, Optional
 
 import cv2
 import numpy as np
 import mediapipe as mp
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from PIL import Image, ImageOps
 
 import ensemble
+
+cv2.setNumThreads(1)
+try:
+    import torch
+    torch.set_num_threads(1)
+except ImportError:
+    pass
 
 app = FastAPI(title="Skinglow AI Service", version="4.0.0")
 
@@ -674,6 +691,11 @@ def resize_for_processing(pil_img: Image.Image):
     return pil_img.resize(new_size, Image.LANCZOS), scale
 
 
+# One analysis at a time: the MediaPipe FaceMesh object is shared and not
+# thread-safe, and with ~0.1 CPU running two at once would only make both slower.
+_ANALYSIS_LOCK = threading.Lock()
+
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(file: UploadFile = File(...)):
     if file.content_type not in ALLOWED_CONTENT_TYPES:
@@ -681,6 +703,20 @@ async def analyze(file: UploadFile = File(...)):
 
     raw_bytes = await file.read()
 
+    # The analysis is slow, blocking CPU work. Running it directly inside this
+    # async function froze the whole server, so Render's /health check (5 s
+    # limit) went unanswered and Render killed the instance mid-analysis
+    # ("Instance failed: HTTP health check failed"). In a worker thread, the
+    # event loop stays free to answer /health while the analysis runs.
+    return await run_in_threadpool(_run_analysis, raw_bytes)
+
+
+def _run_analysis(raw_bytes: bytes) -> AnalyzeResponse:
+    with _ANALYSIS_LOCK:
+        return _analyze_bytes(raw_bytes)
+
+
+def _analyze_bytes(raw_bytes: bytes) -> AnalyzeResponse:
     try:
         pil_img = Image.open(io.BytesIO(raw_bytes))
         pil_img = ImageOps.exif_transpose(pil_img)  # fix sideways/upside-down phone photos
