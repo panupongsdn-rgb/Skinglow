@@ -8,11 +8,11 @@ declare(strict_types=1);
 
 function getDbConnection(): PDO
 {
-    $host = getenv('DB_HOST') ?: 'sql307.infinityfree.com';
-    $port = getenv('DB_PORT') ?: '3306';
-    $dbName = getenv('DB_NAME') ?: 'if0_42826508_skinglow_db';
-    $user = getenv('DB_USER') ?: 'if0_42826508';
-    $pass = getenv('DB_PASS') ?: 'lxQzFOjR1G7Y';
+    $host = getenv('DB_HOST') ?: 'sqlxxx.infinityfree.com';
+    $port = getenv('DB_PORT') ?: 'xxxx';
+    $dbName = getenv('DB_NAME') ?: 'if0_xxxxxxxx_skinglow_db';
+    $user = getenv('DB_USER') ?: 'xxxxxxxxxxxx';
+    $pass = getenv('DB_PASS') ?: 'xxxxxxxxxxxx';
 
     $dsn = "mysql:host={$host};port={$port};dbname={$dbName};charset=utf8mb4";
 
