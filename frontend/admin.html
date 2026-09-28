@@ -23,7 +23,6 @@
   header{
     display:flex; align-items:center; justify-content:space-between;
     padding:22px 6vw; border-bottom:1px solid var(--line); background:var(--panel);
-    flex-wrap:wrap; gap:12px;
   }
   .logo{display:flex; align-items:center; gap:10px; font-family:'Fraunces',serif; font-size:1.2rem; font-weight:600;}
   .logo-mark{width:26px; height:26px; border-radius:50%; background:conic-gradient(from 200deg, var(--blush), var(--sage), var(--blush));}
@@ -31,7 +30,7 @@
     font-family:'IBM Plex Mono',monospace; font-size:.68rem; text-transform:uppercase;
     background:var(--sage-deep); color:#fff; padding:3px 10px; border-radius:999px; margin-left:10px;
   }
-  .user-menu{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .user-menu{display:flex; align-items:center; gap:14px;}
   .user-name{font-size:.85rem; color:var(--ink-soft); font-weight:600;}
   .back-link{font-size:.85rem; color:var(--sage-deep); text-decoration:none; font-weight:600;}
   .back-link:hover{text-decoration:underline;}
@@ -43,7 +42,7 @@
 
   main{padding:36px 6vw 80px; max-width:1180px; margin:0 auto;}
 
-  nav.tabs{display:flex; gap:8px; margin-bottom:28px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  nav.tabs{display:flex; gap:8px; margin-bottom:28px; border-bottom:1px solid var(--line);}
   nav.tabs a{
     padding:10px 4px; margin-right:24px; font-size:.9rem; color:var(--ink-soft); text-decoration:none;
     border-bottom:2px solid transparent; cursor:pointer;
@@ -57,12 +56,6 @@
   .tab-section.active-tab{display:block;}
 
   table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
-
-  @media (max-width:700px){
-    main{padding:24px 5vw 60px;}
-    #usersTableWrap, #productsTableWrap{overflow-x:auto;}
-    table{min-width:640px;}
-  }
   th, td{text-align:left; padding:12px 14px; font-size:.87rem; border-bottom:1px solid var(--line);}
   th{font-family:'IBM Plex Mono',monospace; font-size:.72rem; text-transform:uppercase; color:var(--ink-soft); background:var(--ivory);}
   tr:last-child td{border-bottom:none;}

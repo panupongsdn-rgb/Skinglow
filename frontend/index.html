@@ -130,6 +130,8 @@
     width:78%; height:78%; object-fit:cover; border-radius:50%;
     display:none; position:relative; z-index:2;
   }
+  /* front camera shown like a mirror (move right -> image moves right) */
+  #camera-video.mirrored{ transform:scaleX(-1); }
   .drop-zone{
     z-index:3; text-align:center; padding:20px; cursor:pointer;
   }
@@ -1213,10 +1215,17 @@ scanPanel.addEventListener('drop', (e) => {
 cameraBtn.addEventListener('click', openCamera);
 captureBtn.addEventListener('click', capturePhoto);
 
+// Front camera behaves like a mirror, and the captured photo is flipped the
+// same way, so the analysed photo is exactly what the user saw on screen.
+// Set to false to show and save the camera's raw (un-mirrored) image instead.
+// Flipping doesn't affect detection: the model was trained with fliplr=0.5.
+const MIRROR_FRONT_CAMERA = true;
+
 async function openCamera() {
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
     cameraVideo.srcObject = cameraStream;
+    cameraVideo.classList.toggle('mirrored', MIRROR_FRONT_CAMERA);
     cameraVideo.style.display = 'block';
     previewImg.style.display = 'none';
     dropZone.style.display = 'none';
@@ -1235,7 +1244,13 @@ function capturePhoto() {
   const canvas = document.createElement('canvas');
   canvas.width = cameraVideo.videoWidth;
   canvas.height = cameraVideo.videoHeight;
-  canvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+  const ctx = canvas.getContext('2d');
+  if (MIRROR_FRONT_CAMERA) {
+    // flip horizontally so the photo matches the mirrored preview
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(cameraVideo, 0, 0);
 
   canvas.toBlob((blob) => {
     if (!blob) {
