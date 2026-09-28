@@ -2,7 +2,8 @@
 declare(strict_types=1);
 
 /**
- * Draws bounding boxes + labels on a face image using the GD library.
+ * Draws the analysed face zones (thin outlines) and the detection bounding
+ * boxes + labels on a face image using the GD library.
  * Input format for detections (as returned by the AI service):
  * [
  *   ["box" => [x_min, y_min, x_max, y_max], "label" => "acne", "confidence" => 0.85],
@@ -26,8 +27,10 @@ final class BoundingBoxDrawer
      * @param string $sourcePath      Absolute path to the original uploaded image
      * @param array  $detections      Decoded AI detection results
      * @param string $destinationPath Absolute path to save the annotated image
+     * @param array  $zones           Optional per-zone results; each may carry
+     *                                "polygons" => [[[x, y], ...], ...]
      */
-    public static function draw(string $sourcePath, array $detections, string $destinationPath): bool
+    public static function draw(string $sourcePath, array $detections, string $destinationPath, array $zones = []): bool
     {
         $mime = mime_content_type($sourcePath);
 
@@ -41,6 +44,8 @@ final class BoundingBoxDrawer
         if ($image === false) {
             return false;
         }
+
+        self::drawZones($image, $zones);
 
         foreach ($detections as $detection) {
             $box   = $detection['box'] ?? null;
@@ -79,5 +84,35 @@ final class BoundingBoxDrawer
         imagedestroy($image);
 
         return (bool) $saved;
+    }
+
+    /** Zone outlines: lavender, 2px, drawn under the detection boxes. */
+    private static function drawZones($image, array $zones): void
+    {
+        if (!$zones) {
+            return;
+        }
+        $width = imagesx($image);
+        $thickness = max(2, (int) round($width / 500));
+        imagesetthickness($image, $thickness);
+        $color = imagecolorallocatealpha($image, 179, 136, 235, 20);
+        foreach ($zones as $zone) {
+            foreach (($zone['polygons'] ?? []) as $polygon) {
+                if (!is_array($polygon) || count($polygon) < 3) {
+                    continue;
+                }
+                // imagesetthickness() is ignored for polygons by some GD
+                // builds, so draw the outline a few times, 1px apart
+                for ($t = 0; $t < $thickness; $t++) {
+                    $points = [];
+                    foreach ($polygon as $pt) {
+                        $points[] = (int) ($pt[0] ?? 0) + $t;
+                        $points[] = (int) ($pt[1] ?? 0);
+                    }
+                    imagepolygon($image, $points, $color);
+                }
+            }
+        }
+        imagesetthickness($image, 1);
     }
 }

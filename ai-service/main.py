@@ -1,7 +1,15 @@
 """
-Skinglow AI Service — v4
+Skinglow AI Service — v5
 --------------------------
-Now supports 1..N trained YOLOv8 models via ai-service/ensemble.py, fused
+v5: every face is split into 5 zones — forehead, both cheeks, nose,
+under-eye, chin (face_zones.py) — and each zone is analysed on its own by
+the per-zone classifier in models/zone_classifier.pt (zone_model.py,
+trained with zone_train/). The response gains a `zones` list with a score
+and the conditions found per zone; `skin_score` becomes the mean zone score.
+Without zone_classifier.pt the zones are scored from the YOLO boxes inside
+them, so the response shape is the same either way.
+
+v4: supports 1..N trained YOLOv8 models via ai-service/ensemble.py, fused
 with Weighted Boxes Fusion when more than one is available. Falls back
 automatically to the v2 heuristic CV pipeline (OpenCV color thresholding +
 contour detection) if zero models are present or all fail to load — so the
@@ -46,12 +54,13 @@ from typing import List, Tuple, Optional
 import cv2
 import numpy as np
 import mediapipe as mp
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from PIL import Image, ImageOps
 
 import ensemble
+import face_zones
 
 cv2.setNumThreads(1)
 try:
@@ -60,7 +69,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="Skinglow AI Service", version="4.0.0")
+app = FastAPI(title="Skinglow AI Service", version="5.0.0")
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
@@ -106,15 +115,52 @@ if _available_count > 0:
         print(f"[startup] YOLO warm-up skipped: {_exc!r}")
 
 
+# ---------------------------------------------------------------------
+# Per-zone classifier (forehead / cheeks / nose / under-eye / chin).
+# Trained with ai-service/zone_train/. Optional: without the file the zones
+# are still segmented and scored, from the YOLO boxes that fall inside each
+# zone ("yolo_per_zone"), so the API shape never changes.
+# ---------------------------------------------------------------------
+ZONE_MODEL_PATH = os.getenv(
+    "ZONE_MODEL_PATH", os.path.join(os.path.dirname(__file__), "models", "zone_classifier.pt"))
+ZONE_PREDICTOR = None
+if os.path.exists(ZONE_MODEL_PATH):
+    try:
+        import zone_model
+        ZONE_PREDICTOR = zone_model.load_predictor(ZONE_MODEL_PATH)
+    except Exception as _exc:  # torch missing etc. — keep serving without it
+        print(f"[startup] zone classifier not loaded: {_exc!r}")
+ZONE_MODEL_TYPE = "zone_classifier" if ZONE_PREDICTOR else "yolo_per_zone"
+print(f"[startup] zone analysis -> {ZONE_MODEL_TYPE}")
+
+
 class Detection(BaseModel):
     box: List[int]          # [x_min, y_min, x_max, y_max]
     label: str
     confidence: float
 
 
+class ZoneIssue(BaseModel):
+    label: str               # acne, black_spot, eyebag, oiliness, redness, wrinkle
+    label_th: str
+    probability: float       # 0..1
+
+
+class ZoneResult(BaseModel):
+    zone: str                # forehead | left_cheek | right_cheek | nose | under_eye | chin
+    name_th: str
+    box: List[int]           # [x_min, y_min, x_max, y_max] in original-image pixels
+    polygons: List[List[List[int]]]  # outline(s) as [[x, y], ...]; under_eye has two
+    score: float             # 0-100, higher = healthier skin in this zone
+    issues: List[ZoneIssue]
+    detection_count: int     # YOLO boxes whose area falls mostly in this zone
+
+
 class AnalyzeResponse(BaseModel):
     skin_score: float
     detections: List[Detection]
+    zones: List[ZoneResult] = []
+    zone_model_type: str = "none"
     model_type: str  # "yolov8_trained" or "heuristic_cv_v2" — tells the frontend/PHP which pipeline produced this
     face_detected: bool = True   # False if no face was located at all (image quality/framing issue)
     skin_status: str = "issues_found"  # "clear" | "issues_found" | "no_face_detected"
@@ -336,26 +382,18 @@ def create_strict_face_region(bgr: np.ndarray):
 
     image_height, image_width = bgr.shape[:2]
 
-    rgb = cv2.cvtColor(
-        bgr,
-        cv2.COLOR_BGR2RGB
-    )
-
-    result = FACE_MESH.process(rgb)
-
-    if not result.multi_face_landmarks:
+    # face_zones.detect_landmarks retries with a border around the image, so
+    # selfies where the face fills the whole frame are still found
+    landmarks = face_zones.detect_landmarks(bgr, FACE_MESH)
+    if landmarks is None:
         return None
-
-    landmarks = result.multi_face_landmarks[0].landmark
 
     points = []
 
     for index in FACE_OVAL_INDICES:
 
-        landmark = landmarks[index]
-
-        x = int(landmark.x * image_width)
-        y = int(landmark.y * image_height)
+        x = int(landmarks[index][0])
+        y = int(landmarks[index][1])
 
         x = max(
             0,
@@ -667,12 +705,119 @@ def analyze_face_ml(
         skin_status=status,
     )
 
+# ----------------------------------------------------------------------
+# Zone analysis: segment the face into 5 zones, then analyse each zone
+# ----------------------------------------------------------------------
+# Score penalties (points out of 100 per zone). A zone's score is
+# 100 - ISSUE_PENALTY * probability for every condition found in it
+#     - DETECTION_PENALTY for every extra YOLO box in it (capped).
+ISSUE_PENALTY = 25.0
+DETECTION_PENALTY = 3.0
+MAX_DETECTION_PENALTY = 15.0
+
+
+def _zone_outlines(mask: np.ndarray) -> List[List[List[int]]]:
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    out = []
+    for c in contours:
+        c = cv2.approxPolyDP(c, 1.5, True)
+        if len(c) >= 3:
+            out.append([[int(p[0][0]), int(p[0][1])] for p in c])
+    return out
+
+
+def analyze_zones(bgr: np.ndarray, detections: List[Detection]) -> List[ZoneResult]:
+    """Split the face into forehead / cheeks / nose / under-eye / chin and
+    judge each zone separately. Returns [] if no face landmarks are found."""
+    zones = face_zones.segment_zones(bgr, landmarks=face_zones.detect_landmarks(bgr, FACE_MESH))
+    if not zones:
+        return []
+    names = [n for n in face_zones.ZONE_NAMES if n in zones]
+
+    # which zone each YOLO box belongs to
+    per_zone_dets = {n: [] for n in names}
+    for d in detections:
+        z = face_zones.zone_of_box(zones, d.box)
+        if z in per_zone_dets:
+            per_zone_dets[z].append(d)
+
+    # probability of each condition per zone
+    probs = {}
+    if ZONE_PREDICTOR is not None:
+        crops = [face_zones.crop_zone(bgr, zones[n], size=ZONE_PREDICTOR.img_size) for n in names]
+        for n, pred in zip(names, ZONE_PREDICTOR.predict(crops, names)):
+            probs[n] = {c: v["prob"] for c, v in pred.items() if v["present"]}
+    else:
+        # no classifier yet: a condition is present in a zone when a YOLO box
+        # of that class falls in it; probability = its best confidence
+        for n in names:
+            found = {}
+            for d in per_zone_dets[n]:
+                if d.confidence >= CLEAR_CONFIDENCE_THRESHOLD and face_zones.class_allowed(d.label, n):
+                    found[d.label] = max(found.get(d.label, 0.0), d.confidence)
+            probs[n] = found
+
+    results = []
+    for n in names:
+        z = zones[n]
+        issues = sorted(
+            (ZoneIssue(label=c, label_th=face_zones.CLASS_TH[c], probability=round(float(p), 3))
+             for c, p in probs[n].items()),
+            key=lambda i: i.probability, reverse=True)
+        extra = max(0, len(per_zone_dets[n]) - len(issues))
+        score = 100.0 - sum(ISSUE_PENALTY * i.probability for i in issues) \
+            - min(MAX_DETECTION_PENALTY, DETECTION_PENALTY * extra)
+        results.append(ZoneResult(
+            zone=n, name_th=z.name_th, box=list(z.box), polygons=_zone_outlines(z.mask),
+            score=round(max(0.0, min(100.0, score)), 1), issues=issues,
+            detection_count=len(per_zone_dets[n]),
+        ))
+    return results
+
+
+_SWAP_SIDE = {"left_cheek": "right_cheek", "right_cheek": "left_cheek"}
+
+
+def apply_zone_analysis(bgr: np.ndarray, result: AnalyzeResponse, mirrored: bool = False) -> AnalyzeResponse:
+    """Adds per-zone results and makes the overall score/status agree with them.
+
+    Zone names follow the subject's anatomy on a normal photo. A mirrored
+    selfie shows the left cheek on the image's left, so the cheek names are
+    swapped back for those."""
+    if not result.face_detected:
+        return result
+    try:
+        zones = analyze_zones(bgr, result.detections)
+    except Exception as exc:  # zone analysis must never break the main result
+        import traceback
+        print(f"[analyze] zone analysis failed: {exc!r}")
+        traceback.print_exc()
+        return result
+    if not zones:
+        return result
+    if mirrored:
+        for z in zones:
+            if z.zone in _SWAP_SIDE:
+                z.zone = _SWAP_SIDE[z.zone]
+                z.name_th = face_zones.ZONE_TH[z.zone]
+        zones.sort(key=lambda z: face_zones.ZONE_NAMES.index(z.zone))
+    result.zones = zones
+    result.zone_model_type = ZONE_MODEL_TYPE
+    result.skin_score = round(sum(z.score for z in zones) / len(zones), 1)
+    if any(z.issues for z in zones):
+        result.skin_status = "issues_found"
+    elif result.skin_status == "clear":
+        result.skin_score = max(result.skin_score, 90.0)
+    return result
+
+
 @app.get("/health")
 def health_check():
     return {
         "status": "ok",
         "model_type": MODEL_TYPE,
         "model_count": _available_count,
+        "zone_model_type": ZONE_MODEL_TYPE,
         "models": [
             {"file": cfg["file"], "loaded": m.available, "error": m.load_error}
             for cfg, m in zip(ensemble.ENSEMBLE_CONFIG, ENSEMBLE_MEMBERS)
@@ -710,7 +855,9 @@ _ANALYSIS_LOCK = threading.Lock()
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(file: UploadFile = File(...)):
+async def analyze(file: UploadFile = File(...), mirrored: bool = Form(False)):
+    """`mirrored`: the photo is a mirror image (front-camera capture flipped
+    like a mirror), so the subject's left cheek is on the image's LEFT."""
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=415, detail="Unsupported image type.")
 
@@ -721,15 +868,15 @@ async def analyze(file: UploadFile = File(...)):
     # limit) went unanswered and Render killed the instance mid-analysis
     # ("Instance failed: HTTP health check failed"). In a worker thread, the
     # event loop stays free to answer /health while the analysis runs.
-    return await run_in_threadpool(_run_analysis, raw_bytes)
+    return await run_in_threadpool(_run_analysis, raw_bytes, mirrored)
 
 
-def _run_analysis(raw_bytes: bytes) -> AnalyzeResponse:
+def _run_analysis(raw_bytes: bytes, mirrored: bool = False) -> AnalyzeResponse:
     with _ANALYSIS_LOCK:
-        return _analyze_bytes(raw_bytes)
+        return _analyze_bytes(raw_bytes, mirrored)
 
 
-def _analyze_bytes(raw_bytes: bytes) -> AnalyzeResponse:
+def _analyze_bytes(raw_bytes: bytes, mirrored: bool = False) -> AnalyzeResponse:
     try:
         pil_img = Image.open(io.BytesIO(raw_bytes))
         pil_img = ImageOps.exif_transpose(pil_img)  # fix sideways/upside-down phone photos
@@ -761,10 +908,15 @@ def _analyze_bytes(raw_bytes: bytes) -> AnalyzeResponse:
         else:
             raise HTTPException(status_code=422, detail=f"Analysis failed: {exc}")
 
+    result = apply_zone_analysis(bgr, result, mirrored)
+
     if scale != 1.0:
-        # map detection boxes from the downscaled processing image back to
-        # the original image's coordinate space
+        # map detection boxes and zone outlines from the downscaled
+        # processing image back to the original image's coordinate space
         for detection in result.detections:
             detection.box = [round(v / scale) for v in detection.box]
+        for zone in result.zones:
+            zone.box = [round(v / scale) for v in zone.box]
+            zone.polygons = [[[round(x / scale), round(y / scale)] for x, y in poly] for poly in zone.polygons]
 
     return result

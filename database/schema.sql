@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS analysis_history (
     processed_image_path VARCHAR(255) DEFAULT NULL, -- image with bounding boxes drawn
     skin_score          DECIMAL(5,2) DEFAULT NULL,   -- overall skin health score 0-100
     detections_json      JSON        DEFAULT NULL,   -- raw AI output: boxes/labels/confidence
+    zones_json           JSON        DEFAULT NULL,   -- per-zone results: forehead/cheeks/nose/under_eye/chin
     summary              TEXT        DEFAULT NULL,   -- human readable summary
     created_at           TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_analysis_user

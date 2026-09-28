@@ -20,5 +20,7 @@ numpy==1.26.4
 # requirements.txt`), keep the two-step install above in your build command
 # instead of relying on this file alone — see render.yaml in this repo.
 ultralytics==8.4.118  # must match the version used for training (recorded inside the .pt)
+# torchvision (installed with torch above, from the CPU index) is also used by
+# zone_model.py for the per-zone classifier in models/zone_classifier.pt
 ensemble-boxes==1.0.9
 mediapipe==0.10.21

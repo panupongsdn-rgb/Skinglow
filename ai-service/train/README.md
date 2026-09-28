@@ -1,5 +1,9 @@
 # Training a real skin-condition detection model
 
+> **Per-zone analysis (forehead / cheeks / nose / under-eye / chin) with an
+> Accuracy/F1 evaluation lives in `ai-service/zone_train/` — see
+> `zone_train/README_TH.md`.** This folder covers the YOLO box detector.
+
 The `ai-service/main.py` in this project currently ships as a **classical
 computer-vision heuristic** (OpenCV color thresholding + blob detection).
 It reacts to real pixel data — so it's a step up from the original random
