@@ -4,6 +4,8 @@
  * Body (JSON): { "full_name": "...", "email": "...", "password": "..." }
  */
 
+declare(strict_types=1);
+
 header('Access-Control-Allow-Origin: https://skinglow-eck.pages.dev');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
@@ -12,8 +14,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
-
-declare(strict_types=1);
 
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
@@ -61,12 +61,12 @@ $stmt->execute([
 ]);
 
 $newUserId = (int) $pdo->lastInsertId();
-$token = Auth::issueToken($newUserId);
+$token = Auth::issueToken($newUserId, 'user'); // self-registration always creates a regular user, never admin
 
 echo json_encode([
     'success' => true,
     'data' => [
         'token' => $token,
-        'user' => ['id' => $newUserId, 'full_name' => $fullName, 'email' => $email],
+        'user' => ['id' => $newUserId, 'full_name' => $fullName, 'email' => $email, 'role' => 'user'],
     ],
 ]);

@@ -9,6 +9,9 @@
  * Expected form fields:
  *   - image     (file, required)
  */
+
+declare(strict_types=1);
+
 header('Access-Control-Allow-Origin: https://skinglow-eck.pages.dev');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
@@ -18,12 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-declare(strict_types=1);
-
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/BoundingBoxDrawer.php';
 require_once __DIR__ . '/../src/Auth.php';
+require_once __DIR__ . '/../src/ImageOrientation.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -81,6 +83,12 @@ $originalPath = UPLOAD_ORIGINAL_DIR . $uniqueName;
 if (!move_uploaded_file($file['tmp_name'], $originalPath)) {
     respond(500, ['success' => false, 'message' => 'Failed to store uploaded image.']);
 }
+
+// Fix sideways/upside-down phone photos BEFORE anything else touches this
+// file. GD ignores EXIF orientation, so without this the processed image
+// (with boxes drawn) comes out sideways for portrait phone photos. The AI
+// service applies the same correction (ImageOps.exif_transpose) on its side.
+ImageOrientation::normalize($originalPath, $actualMime);
 
 // ---------------------------------------------------------------
 // 3. Forward image to the Python AI service via cURL
