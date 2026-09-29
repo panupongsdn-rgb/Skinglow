@@ -221,6 +221,17 @@ def crop_zone(bgr: np.ndarray, zone: Zone, size: int = 224, pad: float = 0.08,
     return cv2.resize(canvas, (size, size), interpolation=interp)
 
 
+def zone_outlines(mask: np.ndarray, epsilon: float = 1.5) -> List[List[List[int]]]:
+    """Zone mask -> simplified outline(s) as [[[x, y], ...], ...]."""
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    out = []
+    for c in contours:
+        c = cv2.approxPolyDP(c, epsilon, True)
+        if len(c) >= 3:
+            out.append([[int(p[0][0]), int(p[0][1])] for p in c])
+    return out
+
+
 def zone_of_box(zones: Dict[str, Zone], box) -> Optional[str]:
     """Which zone a detection box mostly falls in (None if outside all)."""
     x1, y1, x2, y2 = [int(v) for v in box]

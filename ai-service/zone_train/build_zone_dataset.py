@@ -7,6 +7,7 @@ Output: zone_dataset/
                                                  (+ one "patch" crop per close-up photo)
           labels.csv                             one row per crop, 6 label columns
           stats.json                             counts, face-detection rate, rules used
+          faces.jsonl                            per image: zone outlines + label boxes (used by review_tool.py)
           preview/*.jpg                          zone + box overlays for a visual check
 
 Each face is split into forehead / left_cheek / right_cheek / nose / under_eye
@@ -161,7 +162,7 @@ def process(job):
     split, image_path, label_path, out_dir, size, meta, labelled, preview_path, closeups, trust_empty = job
     img = cv2.imread(image_path)
     if img is None:
-        return {"image": meta["image"], "status": "unreadable", "rows": []}
+        return {"image": meta["image"], "status": "unreadable", "rows": [], "face": None}
     h, w = img.shape[:2]
     boxes = read_boxes(Path(label_path), w, h)
     if not boxes and not trust_empty:
@@ -170,7 +171,7 @@ def process(job):
     zones = fz.segment_zones(img, landmarks=lm) if lm is not None else None
     if not zones:
         if not closeups or meta["family"] == "neg":
-            return {"image": meta["image"], "status": "no_face", "rows": []}
+            return {"image": meta["image"], "status": "no_face", "rows": [], "face": None}
         # Close-up skin photo (no whole face visible): keep it as one
         # "patch" sample. It teaches what acne/spots/oil look like up close,
         # but is reported separately from the zone metrics.
@@ -196,7 +197,11 @@ def process(job):
             cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255), 1)
             cv2.putText(vis, c, (x1 + 2, y1 + 12), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
         cv2.imwrite(preview_path, vis)
-    return {"image": meta["image"], "status": status, "rows": rows}
+    face = {"image": meta["image"], "split": split, "family": meta["family"], "status": status,
+            "width": w, "height": h,
+            "zones": {n: fz.zone_outlines(z.mask) for n, z in zones.items()},
+            "boxes": [[c, x1, y1, x2, y2] for c, x1, y1, x2, y2 in boxes]}
+    return {"image": meta["image"], "status": status, "rows": rows, "face": face}
 
 
 # ----------------------------------------------------------------------------
@@ -241,11 +246,13 @@ def main():
     print(f"{len(jobs)} images, {args.workers} workers -> {out}")
     status = Counter()
     status_by_split = defaultdict(Counter)
-    all_rows = []
+    all_rows, faces = [], []
     with Pool(args.workers, initializer=_init_worker) as pool:
         for k, res in enumerate(pool.imap_unordered(process, jobs, chunksize=8), 1):
             status[res["status"]] += 1
             all_rows.extend(res["rows"])
+            if res["face"]:
+                faces.append(res["face"])
             if res["rows"]:
                 status_by_split[res["rows"][0]["split"]][res["status"]] += 1
             if k % 500 == 0:
@@ -257,6 +264,11 @@ def main():
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         w.writerows(all_rows)
+
+    faces.sort(key=lambda f: (f["split"], f["image"]))
+    with open(out / "faces.jsonl", "w", encoding="utf-8") as f:
+        for face in faces:
+            f.write(json.dumps(face, ensure_ascii=False) + "\n")
 
     counts = {s: {c: {"pos": 0, "neg": 0, "unknown": 0} for c in CLASSES} for s in ("train", "valid", "test")}
     for r in all_rows:

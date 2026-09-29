@@ -716,16 +716,6 @@ DETECTION_PENALTY = 3.0
 MAX_DETECTION_PENALTY = 15.0
 
 
-def _zone_outlines(mask: np.ndarray) -> List[List[List[int]]]:
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    out = []
-    for c in contours:
-        c = cv2.approxPolyDP(c, 1.5, True)
-        if len(c) >= 3:
-            out.append([[int(p[0][0]), int(p[0][1])] for p in c])
-    return out
-
-
 def analyze_zones(bgr: np.ndarray, detections: List[Detection]) -> List[ZoneResult]:
     """Split the face into forehead / cheeks / nose / under-eye / chin and
     judge each zone separately. Returns [] if no face landmarks are found."""
@@ -768,7 +758,7 @@ def analyze_zones(bgr: np.ndarray, detections: List[Detection]) -> List[ZoneResu
         score = 100.0 - sum(ISSUE_PENALTY * i.probability for i in issues) \
             - min(MAX_DETECTION_PENALTY, DETECTION_PENALTY * extra)
         results.append(ZoneResult(
-            zone=n, name_th=z.name_th, box=list(z.box), polygons=_zone_outlines(z.mask),
+            zone=n, name_th=z.name_th, box=list(z.box), polygons=face_zones.zone_outlines(z.mask),
             score=round(max(0.0, min(100.0, score)), 1), issues=issues,
             detection_count=len(per_zone_dets[n]),
         ))

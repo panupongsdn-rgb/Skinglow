@@ -21,8 +21,15 @@ Plain Accuracy is always high when most zones are clear (a model that says
 The decision threshold of each class is tuned on VALID to maximise F1 and
 then frozen for TEST, so the test numbers are not tuned on the test set.
 
+Human-checked labels from review_tool.py (--reviews zone_reviews.jsonl)
+replace the automatic labels of every reviewed image: all conditions in all
+its zones become known. Images marked "unusable" are dropped. With
+--eval-reviewed-only, valid/test are scored ONLY on reviewed images — use
+that for the numbers in the thesis once the test set has been reviewed.
+
 Typical run on an RTX 3070 (8 GB):
     python train_zone_classifier.py --data zone_dataset --arch efficientnet_b0 --epochs 40 --batch 64
+    python train_zone_classifier.py --data zone_dataset --reviews zone_reviews.jsonl --eval-reviewed-only
 """
 from __future__ import annotations
 
@@ -53,16 +60,43 @@ FACE_ZONES = [z for z in ZONES if z != "patch"]
 # ----------------------------------------------------------------------------
 # Data
 # ----------------------------------------------------------------------------
-def read_rows(data_dir: Path):
+def load_reviews(path: Path):
+    """Latest review per image from review_tool.py's append-only jsonl."""
+    latest = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                r = json.loads(line)
+                latest[r["image"]] = r
+            except (json.JSONDecodeError, KeyError):
+                continue
+    return latest
+
+
+def read_rows(data_dir: Path, reviews: dict | None = None):
     with open(data_dir / "labels.csv", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     allowed = allowed_matrix().numpy()
+    reviews = reviews or {}
+    out = []
     for r in rows:
         zi = ZONES.index(r["zone"])
         y = np.array([int(r[c]) for c in CLASSES], dtype=np.float32)
+        rev = reviews.get(r["image"])
+        r["reviewed"] = False
+        if rev is not None:
+            if rev.get("status") == "bad":
+                continue  # a person marked the image unusable
+            zl = rev.get("labels", {}).get(r["zone"])
+            if zl is not None:
+                for j, c in enumerate(CLASSES):
+                    if c in zl:
+                        y[j] = float(zl[c])
+                r["reviewed"] = True
         y[allowed[zi] == 0] = -1  # never learn / score impossible pairs
         r["y"], r["zi"] = y, zi
-    return rows
+        out.append(r)
+    return out
 
 
 class ZoneCrops(Dataset):
@@ -219,7 +253,8 @@ def write_report(path: Path, res: dict, res_patch: dict | None, split: str, args
     L = [f"# Skinglow zone classifier — {split} results", "",
          f"- Model: `{args.arch}` · image {args.img}px · data `{args.data}`",
          f"- Crops evaluated (face zones): {o['crops']} · known labels: {o['known_labels']}",
-         f"- Thresholds: tuned on **valid** for best F1, frozen for {split}", "",
+         f"- Thresholds: tuned on **valid** for best F1, frozen for {split}",
+         f"- Labels: {'**human-reviewed images only** (review_tool.py)' if args.eval_reviewed_only else 'automatic zone labels' + (' + reviews' if args.reviews else '')}", "",
          "## ผลรวม / Overall", "",
          "| Metric | Value |", "|---|---|",
          f"| **Macro-F1** (ค่าเฉลี่ย F1 ของ {len(o['classes_scored'])} คลาส) | **{fmt(o['macro_f1'])}** |",
@@ -264,6 +299,9 @@ def main():
     ap.add_argument("--no-pretrained", action="store_true", help="random init (debug only; much worse)")
     ap.add_argument("--no-sampler", action="store_true", help="disable rare-class oversampling")
     ap.add_argument("--no-patches", action="store_true", help="train on face zones only")
+    ap.add_argument("--reviews", default=None, help="zone_reviews.jsonl from review_tool.py")
+    ap.add_argument("--eval-reviewed-only", action="store_true",
+                    help="tune thresholds and report metrics only on human-reviewed valid/test images")
     ap.add_argument("--target", type=float, default=0.80, help="Macro-F1 goal printed in the report")
     ap.add_argument("--name", default=None)
     ap.add_argument("--out", default="runs_zone")
@@ -278,8 +316,20 @@ def main():
     run = Path(args.out) / (args.name or f"{args.arch}_{time.strftime('%Y%m%d_%H%M')}")
     run.mkdir(parents=True, exist_ok=True)
 
-    rows = read_rows(data_dir)
+    reviews = load_reviews(Path(args.reviews)) if args.reviews else {}
+    rows = read_rows(data_dir, reviews)
     split = {s: [r for r in rows if r["split"] == s] for s in ("train", "valid", "test")}
+    reviewed_counts = {s: sum(r["reviewed"] for r in v) for s, v in split.items()}
+    if args.reviews:
+        print(f"reviews: {len(reviews)} images · reviewed crops " +
+              ", ".join(f"{s}={n}" for s, n in reviewed_counts.items()))
+    if args.eval_reviewed_only:
+        for s in ("valid", "test"):
+            only = [r for r in split[s] if r["reviewed"]]
+            if only:
+                split[s] = only
+            else:
+                print(f"WARNING: no reviewed {s} crops yet — evaluating {s} on all crops")
     if args.no_patches:
         split["train"] = [r for r in split["train"] if r["zone"] != "patch"]
     print(f"device={device}  crops: " + ", ".join(f"{s}={len(v)}" for s, v in split.items()))

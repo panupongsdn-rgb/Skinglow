@@ -14,6 +14,8 @@ if "%EPOCHS%"=="" set EPOCHS=40
 if "%BATCH%"=="" set BATCH=64
 
 if exist .venv\Scripts\activate.bat call .venv\Scripts\activate.bat
+set REVIEW_ARGS=
+if exist zone_reviews.jsonl set REVIEW_ARGS=--reviews zone_reviews.jsonl --eval-reviewed-only
 
 if not exist zone_dataset\labels.csv (
     echo [1/2] Building zone dataset from %DATA_ROOT% ...
@@ -23,7 +25,7 @@ if not exist zone_dataset\labels.csv (
 )
 
 echo [2/2] Training %ARCH% ...
-python "%KIT%train_zone_classifier.py" --data zone_dataset --arch %ARCH% --epochs %EPOCHS% --batch %BATCH% --workers 4 || goto :error
+python "%KIT%train_zone_classifier.py" --data zone_dataset --arch %ARCH% --epochs %EPOCHS% --batch %BATCH% --workers 4 %REVIEW_ARGS% || goto :error
 
 echo.
 echo Done. Open runs_zone\...\report_test.md for the Accuracy / F1 tables.
