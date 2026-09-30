@@ -5,7 +5,7 @@ Draws the evaluation figures of a zone-classifier run next to curves.png:
 
   confusion_<split>.png   2x2 confusion matrix per class (counts + % of the true row)
   confusion_overall_<split>.png   all classes pooled into one 2x2 + TP/FN/FP/TN table per class
-  confusion_multilabel_<split>.png   true class x predicted class (+ "none")       *
+  confusion_matrix[_normalized]_<split>.png   YOLO-style predicted x true (+ background) *
   per_class_<split>.png   Precision / Recall / F1 per class, with the target line
   per_zone_<split>.png    Accuracy and Macro-F1 per face zone
   roc_<split>.png         ROC curve per class (AUC in the legend)          *
@@ -122,41 +122,49 @@ def confusion_overall(m, split, out: Path):
 
 
 def confusion_multilabel(Y, P, Z, face_idx, th, split, out: Path):
-    """Class x class matrix (true class rows, predicted class columns) for multi-label
-    output. Row "none" = zones with no true problem; column "none" = no problem predicted.
-    Cell = how many zones with that true problem the model tagged with that class;
-    rows are normalised by the number of zones in the row. Off-diagonal = confusion
-    between problems (e.g. true acne predicted as redness)."""
+    """YOLO-style confusion matrix (rows = predicted, columns = true, plus "background").
+    A zone can have several problems, so each zone is matched like YOLO matches boxes:
+      true & predicted            -> diagonal
+      missed true + extra predicted in the same zone -> paired off-diagonal (a mix-up)
+      missed true left over       -> predicted "background" (model saw nothing)
+      extra predicted left over   -> true "background" (false alarm on clear skin)"""
     plt = _plt()
     keep = np.isin(Z, face_idx); Y, P = Y[keep], P[keep]
     pred = np.stack([(P[:, j] >= th[c]).astype(int) for j, c in enumerate(CLASSES)], 1)
     known = Y >= 0
-    pred = np.where(known, pred, 0)           # only count classes the zone can have / has a label for
-    true = (Y == 1)
-    k = len(CLASSES)
-    M = np.zeros((k + 1, k + 1)); n_row = np.zeros(k + 1)
-    for t, pr in zip(true, pred):
-        rows = np.where(t)[0].tolist() or [k]
-        cols = np.where(pr == 1)[0].tolist() or [k]
-        for r in rows:
-            n_row[r] += 1
-            for c_ in cols:
-                M[r, c_] += 1
-    pct = M / np.maximum(n_row[:, None], 1)
-    names = [LABEL[c] for c in CLASSES] + ["none"]
-    fig, ax = plt.subplots(figsize=(8.2, 7))
-    ax.imshow(pct, cmap="Blues", vmin=0, vmax=1)
-    for i in range(k + 1):
-        for j in range(k + 1):
-            if M[i, j]:
-                ax.text(j, i, f"{int(M[i, j])}\n{pct[i, j] * 100:.0f}%", ha="center", va="center", fontsize=8,
-                        color="white" if pct[i, j] > 0.55 else "#1d2733")
-    ax.set_xticks(range(k + 1), names, rotation=30, ha="right"); ax.set_yticks(range(k + 1), [f"{n} ({int(c)})" for n, c in zip(names, n_row)])
-    ax.set_xlabel("Predicted"); ax.set_ylabel("True (zones)")
-    ax.set_title(f"Multi-label confusion matrix — {split}\n(a zone can have several problems; % of the row)", fontsize=10)
-    for sp in ax.spines.values():
-        sp.set_visible(False)
-    fig.tight_layout(); fig.savefig(out / f"confusion_multilabel_{split}.png", dpi=150); plt.close(fig)
+    k = len(CLASSES); B = k
+    M = np.zeros((k + 1, k + 1), int)          # M[pred, true]
+    for y, pr, kn in zip(Y, pred, known):
+        t = {j for j in range(k) if kn[j] and y[j] == 1}
+        q = {j for j in range(k) if kn[j] and pr[j] == 1}
+        for j in t & q:
+            M[j, j] += 1
+        miss, extra = sorted(t - q), sorted(q - t)
+        while miss and extra:
+            M[extra.pop(0), miss.pop(0)] += 1
+        for j in miss:
+            M[B, j] += 1
+        for j in extra:
+            M[j, B] += 1
+    names = CLASSES + ["background"]
+    for norm in (False, True):
+        V = M / np.maximum(M.sum(0, keepdims=True), 1) if norm else M
+        fig, ax = plt.subplots(figsize=(10, 7.5))
+        im = ax.imshow(np.where(M > 0, V, np.nan), cmap="Blues", vmin=0, vmax=1 if norm else max(M.max(), 1))
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        for i in range(k + 1):
+            for j in range(k + 1):
+                if M[i, j]:
+                    txt = f"{V[i, j]:.2f}" if norm else f"{M[i, j]}"
+                    ax.text(j, i, txt, ha="center", va="center", fontsize=10,
+                            color="white" if (V[i, j] > (0.55 if norm else 0.55 * M.max())) else "#1d2733")
+        ax.set_xticks(range(k + 1), names, rotation=90); ax.set_yticks(range(k + 1), names)
+        ax.set_xlabel("True"); ax.set_ylabel("Predicted")
+        ax.set_title("Confusion Matrix" + (" Normalized" if norm else "") + f" — {split} (zones)")
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+        fig.tight_layout()
+        fig.savefig(out / f"confusion_matrix{'_normalized' if norm else ''}_{split}.png", dpi=150); plt.close(fig)
 
 
 def per_class(m, split, out: Path, target: float):
