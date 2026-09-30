@@ -19,6 +19,8 @@ if "%BATCH%"=="" set BATCH=64
 
 set REVIEW_ARGS=
 if exist zone_reviews.jsonl set REVIEW_ARGS=--reviews zone_reviews.jsonl --eval-reviewed-only
+if exist review_compare\zone_reviews_final.jsonl set REVIEW_ARGS=--reviews review_compare\zone_reviews_final.jsonl --eval-reviewed-only
+if not "%REVIEW_ARGS%"=="" echo Using human-checked labels: %REVIEW_ARGS%
 
 if not exist zone_dataset\labels.csv (
     echo [1/2] Building zone dataset from %DATA_ROOT% ...
