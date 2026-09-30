@@ -254,7 +254,7 @@ def write_report(path: Path, res: dict, res_patch: dict | None, split: str, args
          f"- Model: `{args.arch}` · image {args.img}px · data `{args.data}`",
          f"- Crops evaluated (face zones): {o['crops']} · known labels: {o['known_labels']}",
          f"- Thresholds: tuned on **valid** for best F1, frozen for {split}",
-         f"- Labels: {'**human-reviewed images only** (review_tool.py)' if args.eval_reviewed_only else 'automatic zone labels' + (' + reviews' if args.reviews else '')}", "",
+         f"- Labels: {'**human-reviewed images only** (review_tool.py)' if split in getattr(args, 'reviewed_only_splits', ()) else 'automatic zone labels' + (' + reviews' if args.reviews else '')}", "",
          "## ผลรวม / Overall", "",
          "| Metric | Value |", "|---|---|",
          f"| **Macro-F1** (ค่าเฉลี่ย F1 ของ {len(o['classes_scored'])} คลาส) | **{fmt(o['macro_f1'])}** |",
@@ -323,11 +323,13 @@ def main():
     if args.reviews:
         print(f"reviews: {len(reviews)} images · reviewed crops " +
               ", ".join(f"{s}={n}" for s, n in reviewed_counts.items()))
+    args.reviewed_only_splits = set()
     if args.eval_reviewed_only:
         for s in ("valid", "test"):
             only = [r for r in split[s] if r["reviewed"]]
             if only:
                 split[s] = only
+                args.reviewed_only_splits.add(s)
             else:
                 print(f"WARNING: no reviewed {s} crops yet — evaluating {s} on all crops")
     if args.no_patches:
