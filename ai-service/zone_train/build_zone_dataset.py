@@ -217,7 +217,10 @@ def main():
     ap.add_argument("--trust-empty-images", action="store_true",
                     help="treat images with an empty label file as clear skin (negative for their source's classes)")
     ap.add_argument("--limit", type=int, default=0, help="debug: only process N images")
+    ap.add_argument("--splits", default="train,valid,test",
+                    help="comma-separated splits to build, e.g. 'test' to prepare only the test set for review")
     args = ap.parse_args()
+    want_splits = {s.strip() for s in args.splits.split(",") if s.strip()}
 
     root, out = Path(args.data_root), Path(args.out)
     rows = [json.loads(l) for l in (root / "manifest.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
@@ -227,6 +230,8 @@ def main():
 
     jobs = []
     for i, r in enumerate(rows):
+        if r["split"] not in want_splits:
+            continue
         img = root / r["split"] / "images" / r["image"]
         if not img.exists():
             continue

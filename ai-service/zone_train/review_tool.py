@@ -24,6 +24,8 @@ build_zone_dataset.py. Pass the file to train_zone_classifier.py with
 Usage (from the skinglow-trian folder):
     python <repo>/ai-service/zone_train/review_tool.py --zones zone_dataset --data-root dataset_clean_v2
     python ... --model runs_zone/<run>/best.pt        # AI suggestions from round 1
+    python ... --compare zone_reviews.jsonl zone_reviews_claude.jsonl --reviews zone_reviews_adjudicated.jsonl
+                                                      # settle disagreements of two reviewers
 Then open http://127.0.0.1:8765 (opens automatically). Only reachable from
 this computer. Ctrl+C to stop; nothing is lost, every save is on disk.
 """
@@ -68,8 +70,11 @@ def load_reviews(path: Path):
 
 class Store:
     def __init__(self, zones_dir: Path, data_root: Path, reviews_path: Path, model_path: str | None,
-                 ai_min_prob: float = 0.6, ai_on_test: bool = False):
+                 ai_min_prob: float = 0.6, ai_on_test: bool = False, compare: list | None = None):
         self.ai_min_prob, self.ai_on_test = ai_min_prob, ai_on_test
+        # adjudication mode: two independent reviews of the same images; only images where
+        # they disagree are queued, agreed cells are pre-filled, conflicting cells are flagged
+        self.cmp = [load_reviews(Path(p)) for p in compare] if compare else None
         self.zones_dir, self.data_root, self.reviews_path = zones_dir, data_root, reviews_path
         self.lock = threading.Lock()
         faces_path = zones_dir / "faces.jsonl"
@@ -95,6 +100,12 @@ class Store:
                 sys.exit(f"could not load model {model_path}")
             print(f"AI suggestions from {model_path}")
 
+    def _differs(self, img):
+        ra, rb = self.cmp[0].get(img), self.cmp[1].get(img)
+        if not ra or not rb:
+            return False
+        return ra["status"] != rb["status"] or (ra["status"] == "ok" and ra["labels"] != rb["labels"])
+
     def _make_order(self):
         """test first, then valid, then train images most worth reviewing:
         faces with rare classes (redness / eyebag) and with many unknowns."""
@@ -105,7 +116,10 @@ class Store:
             rare = any(r[c] == "1" for r in zones.values() for c in RARE)
             is_patch = face["status"] != "ok"
             return (SPLIT_ORDER.get(face["split"], 3), is_patch, not rare, -unknown, img)
-        return sorted((i for i in self.faces if i in self.rows), key=key)
+        imgs = [i for i in self.faces if i in self.rows]
+        if self.cmp is not None:
+            imgs = [i for i in imgs if self._differs(i)]
+        return sorted(imgs, key=key)
 
     def suggestions(self, img):
         if not self.predictor:
@@ -126,9 +140,15 @@ class Store:
         return out
 
     def item(self, idx):
+        if not self.order:
+            raise ValueError("ไม่มีภาพให้ตรวจ" + (" — ผู้ตรวจทั้งสองตอบตรงกันทุกภาพ" if self.cmp is not None else ""))
         img = self.order[idx]
         face = self.faces[img]
-        ai = self.suggestions(img) if (face["split"] != "test" or self.ai_on_test) else {}
+        ai = {} if self.cmp is not None else (
+            self.suggestions(img) if (face["split"] != "test" or self.ai_on_test) else {})
+        ra = rb = None
+        if self.cmp is not None:
+            ra, rb = self.cmp[0].get(img), self.cmp[1].get(img)
         thr = dict(zip(CLASSES, self.predictor.thresholds.tolist())) if self.predictor else {}
         zones = []
         for z in ZONE_ORDER:
@@ -144,12 +164,19 @@ class Store:
                             "ai": None if p is None or not allowed else round(p, 2),
                             "ai_on": bool(p is not None and allowed
                                           and p >= max(thr.get(c, 0.5), self.ai_min_prob))}
+                if ra is not None and allowed:
+                    va = ra.get("labels", {}).get(z, {}).get(c) if ra["status"] == "ok" else None
+                    vb = rb.get("labels", {}).get(z, {}).get(c) if rb["status"] == "ok" else None
+                    cells[c].update(orig=None, a=va, b=vb, conflict=va != vb)
             zones.append({"zone": z, "name_th": ZONE_TH.get(z, z), "cells": cells,
                           "polygons": face["zones"].get(z, [])})
         return {"index": idx, "total": len(self.order), "image": img, "split": face["split"],
                 "family": face["family"], "status": face["status"], "width": face["width"],
                 "height": face["height"], "boxes": face["boxes"], "zones": zones,
-                "review": self.reviews.get(img)}
+                "review": self.reviews.get(img),
+                "compare": None if ra is None else {"a_status": ra["status"], "b_status": rb["status"],
+                                                   "a_name": ra.get("reviewer") or "A",
+                                                   "b_name": rb.get("reviewer") or "B"}}
 
     def save(self, payload):
         img = payload.get("image")
@@ -184,7 +211,8 @@ class Store:
                                if self.faces[i]["split"] == s and i not in self.reviews), None)
                       for s in SPLIT_ORDER}
         return {"total": dict(per_split), "reviewed": dict(done), "positives": dict(pos),
-                "first_unreviewed": first_open, "ai": self.predictor is not None}
+                "first_unreviewed": first_open, "ai": self.predictor is not None,
+                "compare": self.cmp is not None}
 
 
 def make_handler(store: Store, html: bytes):
@@ -248,12 +276,17 @@ def main():
     ap.add_argument("--model", default=None, help="optional zone classifier best.pt for AI suggestions")
     ap.add_argument("--ai-min-prob", type=float, default=0.6, help="pre-tick AI suggestions only at/above this probability")
     ap.add_argument("--ai-on-test", action="store_true", help="also show AI suggestions on the test split (not recommended)")
+    ap.add_argument("--compare", nargs=2, metavar=("A.jsonl", "B.jsonl"), default=None,
+                    help="adjudication: show only images where two independent reviews disagree "
+                         "(save to a separate --reviews file, e.g. zone_reviews_adjudicated.jsonl)")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
 
+    if args.compare and Path(args.reviews).resolve() in {Path(p).resolve() for p in args.compare}:
+        sys.exit("--reviews must be a new file in --compare mode, not one of the two files being compared")
     store = Store(Path(args.zones), Path(args.data_root), Path(args.reviews), args.model,
-                  args.ai_min_prob, args.ai_on_test)
+                  args.ai_min_prob, args.ai_on_test, args.compare)
     html = (HERE / "review_tool.html").read_bytes()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(store, html))
     url = f"http://127.0.0.1:{args.port}"
