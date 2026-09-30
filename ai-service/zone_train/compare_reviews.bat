@@ -9,16 +9,19 @@ REM  A = zone_reviews.jsonl (you), B = zone_reviews_claude.jsonl (second reviewe
 REM ============================================================
 setlocal
 set KIT=%~dp0
+set PY=python
+if exist "%CD%\.venv\Scripts\python.exe" set PY="%CD%\.venv\Scripts\python.exe"
+if exist "%KIT%..\..\.venv\Scripts\python.exe" set PY="%KIT%..\..\.venv\Scripts\python.exe"
+if exist "%KIT%..\..\.venv\Scripts\python.exe" cd /d "%KIT%..\.."
 if "%DATA_ROOT%"=="" set DATA_ROOT=%CD%\dataset_clean_v2
 if "%ZONES%"=="" if exist zone_dataset\faces.jsonl set ZONES=zone_dataset
 if "%ZONES%"=="" set ZONES=zone_dataset_test
 if "%A%"=="" set A=zone_reviews.jsonl
 if "%B%"=="" set B=zone_reviews_claude.jsonl
-if exist .venv\Scripts\activate.bat call .venv\Scripts\activate.bat
 if /I "%1"=="adjudicate" (
-  python "%KIT%review_tool.py" --zones "%ZONES%" --data-root "%DATA_ROOT%" --compare "%A%" "%B%" --reviews zone_reviews_adjudicated.jsonl
+  %PY% "%KIT%review_tool.py" --zones "%ZONES%" --data-root "%DATA_ROOT%" --compare "%A%" "%B%" --reviews zone_reviews_adjudicated.jsonl
 ) else if /I "%1"=="final" (
-  python "%KIT%compare_reviews.py" --a "%A%" --b "%B%" --adjudicated zone_reviews_adjudicated.jsonl --final
+  %PY% "%KIT%compare_reviews.py" --a "%A%" --b "%B%" --adjudicated zone_reviews_adjudicated.jsonl --final
 ) else (
-  python "%KIT%compare_reviews.py" --a "%A%" --b "%B%"
+  %PY% "%KIT%compare_reviews.py" --a "%A%" --b "%B%"
 )
