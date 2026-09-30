@@ -4,6 +4,8 @@ plot_results.py — กราฟผลการทดลองสำหรับ
 Draws the evaluation figures of a zone-classifier run next to curves.png:
 
   confusion_<split>.png   2x2 confusion matrix per class (counts + % of the true row)
+  confusion_overall_<split>.png   all classes pooled into one 2x2 + TP/FN/FP/TN table per class
+  confusion_multilabel_<split>.png   true class x predicted class (+ "none")       *
   per_class_<split>.png   Precision / Recall / F1 per class, with the target line
   per_zone_<split>.png    Accuracy and Macro-F1 per face zone
   roc_<split>.png         ROC curve per class (AUC in the legend)          *
@@ -76,6 +78,85 @@ def confusion(m, split, out: Path):
             sp.set_visible(False)
     fig.suptitle("Confusion matrix per class — " + _title(split, m), fontsize=11)
     fig.tight_layout(); fig.savefig(out / f"confusion_{split}.png", dpi=150); plt.close(fig)
+
+
+def confusion_overall(m, split, out: Path):
+    """One figure for the whole model: all classes pooled into one 2x2 (micro)
+    next to a table of every class's TP / FN / FP / TN."""
+    plt = _plt()
+    pc = m["per_class"]
+    tot = {k: sum(pc[c][k] for c in CLASSES) for k in ("TP", "FP", "TN", "FN")}
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.8), gridspec_kw={"width_ratios": [1, 1.5]})
+    mat = np.array([[tot["TN"], tot["FP"]], [tot["FN"], tot["TP"]]], float)
+    rows = mat.sum(1, keepdims=True); pct = mat / np.maximum(rows, 1)
+    a1.imshow(pct, cmap="Blues", vmin=0, vmax=1)
+    for i in range(2):
+        for j in range(2):
+            a1.text(j, i, f"{int(mat[i, j])}\n{pct[i, j] * 100:.1f}%", ha="center", va="center",
+                    color="white" if pct[i, j] > 0.55 else "#1d2733", fontsize=13)
+    a1.set_xticks([0, 1], ["Predicted: no", "Predicted: yes"]); a1.set_yticks([0, 1], ["True: no", "True: yes"])
+    prec = tot["TP"] / max(tot["TP"] + tot["FP"], 1); rec = tot["TP"] / max(tot["TP"] + tot["FN"], 1)
+    f1 = 2 * prec * rec / max(prec + rec, 1e-9); acc = (tot["TP"] + tot["TN"]) / max(sum(tot.values()), 1)
+    a1.set_title(f"All classes pooled (micro)\nacc {acc * 100:.1f}% · precision {prec * 100:.1f}% · "
+                 f"recall {rec * 100:.1f}% · F1 {f1 * 100:.1f}%", fontsize=10)
+    for sp in a1.spines.values():
+        sp.set_visible(False)
+    # per-class table, each cell coloured by its share of that class's true row
+    cols = ["TP", "FN", "FP", "TN"]
+    data = np.array([[pc[c][k] for k in cols] for c in CLASSES], float)
+    pos = data[:, 0] + data[:, 1]; neg = data[:, 2] + data[:, 3]
+    share = np.c_[data[:, 0] / np.maximum(pos, 1), data[:, 1] / np.maximum(pos, 1),
+                  data[:, 2] / np.maximum(neg, 1), data[:, 3] / np.maximum(neg, 1)]
+    good = np.c_[share[:, 0], 1 - share[:, 1], 1 - share[:, 2], share[:, 3]]
+    a2.imshow(good, cmap="RdYlGn", vmin=0, vmax=1, aspect="auto")
+    for i in range(len(CLASSES)):
+        for j in range(4):
+            a2.text(j, i, f"{int(data[i, j])}\n{share[i, j] * 100:.1f}%", ha="center", va="center", fontsize=9)
+    a2.set_xticks(range(4), ["TP\n(true yes → yes)", "FN\n(true yes → no)", "FP\n(true no → yes)", "TN\n(true no → no)"])
+    a2.set_yticks(range(len(CLASSES)), [f"{LABEL[c]}  F1 {pc[c]['f1'] * 100:.0f}%" for c in CLASSES])
+    a2.set_title("Per class (% of that class's true yes / true no)", fontsize=10)
+    for sp in a2.spines.values():
+        sp.set_visible(False)
+    fig.suptitle("Overall confusion — " + _title(split, m), fontsize=11)
+    fig.tight_layout(); fig.savefig(out / f"confusion_overall_{split}.png", dpi=150); plt.close(fig)
+
+
+def confusion_multilabel(Y, P, Z, face_idx, th, split, out: Path):
+    """Class x class matrix (true class rows, predicted class columns) for multi-label
+    output. Row "none" = zones with no true problem; column "none" = no problem predicted.
+    Cell = how many zones with that true problem the model tagged with that class;
+    rows are normalised by the number of zones in the row. Off-diagonal = confusion
+    between problems (e.g. true acne predicted as redness)."""
+    plt = _plt()
+    keep = np.isin(Z, face_idx); Y, P = Y[keep], P[keep]
+    pred = np.stack([(P[:, j] >= th[c]).astype(int) for j, c in enumerate(CLASSES)], 1)
+    known = Y >= 0
+    pred = np.where(known, pred, 0)           # only count classes the zone can have / has a label for
+    true = (Y == 1)
+    k = len(CLASSES)
+    M = np.zeros((k + 1, k + 1)); n_row = np.zeros(k + 1)
+    for t, pr in zip(true, pred):
+        rows = np.where(t)[0].tolist() or [k]
+        cols = np.where(pr == 1)[0].tolist() or [k]
+        for r in rows:
+            n_row[r] += 1
+            for c_ in cols:
+                M[r, c_] += 1
+    pct = M / np.maximum(n_row[:, None], 1)
+    names = [LABEL[c] for c in CLASSES] + ["none"]
+    fig, ax = plt.subplots(figsize=(8.2, 7))
+    ax.imshow(pct, cmap="Blues", vmin=0, vmax=1)
+    for i in range(k + 1):
+        for j in range(k + 1):
+            if M[i, j]:
+                ax.text(j, i, f"{int(M[i, j])}\n{pct[i, j] * 100:.0f}%", ha="center", va="center", fontsize=8,
+                        color="white" if pct[i, j] > 0.55 else "#1d2733")
+    ax.set_xticks(range(k + 1), names, rotation=30, ha="right"); ax.set_yticks(range(k + 1), [f"{n} ({int(c)})" for n, c in zip(names, n_row)])
+    ax.set_xlabel("Predicted"); ax.set_ylabel("True (zones)")
+    ax.set_title(f"Multi-label confusion matrix — {split}\n(a zone can have several problems; % of the row)", fontsize=10)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    fig.tight_layout(); fig.savefig(out / f"confusion_multilabel_{split}.png", dpi=150); plt.close(fig)
 
 
 def per_class(m, split, out: Path, target: float):
@@ -175,12 +256,15 @@ def plot_all(run: Path, target: float = 0.80, face_idx=None):
         if f.exists():
             metrics[s] = json.loads(f.read_text(encoding="utf-8"))
     for s, m in metrics.items():
-        confusion(m, s, run); per_class(m, s, run, target); per_zone(m, s, run, target)
+        confusion(m, s, run); confusion_overall(m, s, run)
+        per_class(m, s, run, target); per_zone(m, s, run, target)
         npz = run / f"preds_{s}.npz"
         if npz.exists():
             d = np.load(npz)
             fi = face_idx if face_idx is not None else d["face_idx"]
             roc_pr(d["Y"], d["P"], d["Z"], fi, m, s, run)
+            th = {c: m["per_class"][c]["threshold"] for c in CLASSES}
+            confusion_multilabel(d["Y"], d["P"], d["Z"], fi, th, s, run)
     if "valid" in metrics and "test" in metrics:
         valid_vs_test(metrics["valid"], metrics["test"], run, target)
     return sorted(p.name for p in set(run.glob("*.png")) - before) or sorted(p.name for p in run.glob("*.png"))
