@@ -277,7 +277,21 @@ async function load(i){
   meta(); render();
 }
 
+let confirmIdx = -1, busy = false;
 async function submit(status){
+  if (busy) return;
+  if (status === 'ok' && item.compare) {
+    const open = item.zones.reduce((n, z) => n + Object.values(state[z.zone]).filter(st => st.src === 'conflict').length, 0);
+    if (open && confirmIdx !== item.index) {
+      confirmIdx = item.index;
+      toast(`ยังไม่ได้ตัดสิน ${open} ช่อง (ขอบประสีแดง) — กดบันทึกอีกครั้งถ้าจะให้เป็น "ไม่มี" ทั้งหมด`);
+      return;
+    }
+  }
+  busy = true;
+  try { await doSubmit(status); } finally { busy = false; }
+}
+async function doSubmit(status){
   const labels = {};
   if (status === 'ok') item.zones.forEach(z => {
     labels[z.zone] = {};
@@ -299,6 +313,7 @@ $('jump').addEventListener('change', e => load(Math.max(0, (+e.target.value || 1
 document.addEventListener('keydown', e => {
   if (!item || e.target.tagName === 'INPUT') return;
   const k = e.key;
+  if (e.repeat && (k === 'Enter' || k === 'x' || k === 'X' || k === 'ArrowRight')) { e.preventDefault(); return; }
   if (k === 'Enter') { e.preventDefault(); submit('ok'); }
   else if (k === 'ArrowRight') { e.preventDefault(); $('skip').click(); }
   else if (k === 'ArrowLeft') { e.preventDefault(); $('prev').click(); }
