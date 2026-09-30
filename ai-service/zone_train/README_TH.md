@@ -75,6 +75,10 @@ python "%REPO%\zone_train\train_zone_classifier.py" --data zone_dataset --arch e
 | `metrics_test.json` | ตัวเลขชุดเดียวกันในรูป JSON |
 | `curves.png` | กราฟ loss และ F1 ต่อ epoch |
 | `best.pt` | ไฟล์โมเดลที่จะนำไป deploy |
+| `confusion_test.png`, `per_class_test.png`, `per_zone_test.png` | confusion matrix รายคลาส, Precision/Recall/F1 รายคลาส, ผลรายโซน (มีชุด `_valid` ด้วย) |
+| `roc_test.png`, `pr_test.png`, `valid_vs_test.png` | ROC และ Precision-Recall รายคลาส (จุด = threshold ที่ใช้), F1 valid เทียบ test |
+
+รันที่เทรนก่อนมีไฟล์ `plot_results.py` ให้สร้างกราฟย้อนหลังด้วย `make_figures.bat` (เลือกรันล่าสุดให้เอง หรือ `make_figures.bat runs_zone\<ชื่อรัน>`)
 
 **ควรรายงานตัวเลขไหน:** ใช้ **Macro-F1** เป็นตัวเลขหลัก และรายงานคู่กับ Balanced accuracy
 Accuracy อย่างเดียวจะสูงเกินจริงเสมอ เพราะโซนส่วนใหญ่ไม่มีปัญหา โมเดลที่ตอบว่า "ไม่มีสิว" ทุกโซนก็ได้ accuracy สูงแล้ว

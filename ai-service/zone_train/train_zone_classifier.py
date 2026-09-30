@@ -9,6 +9,7 @@ Output: runs_zone/<name>/
           metrics_test.json    metrics on the untouched test split  <- report THESE in the thesis
           report_test.md       the same, as tables (Thai + English)
           curves.png           training curves (if matplotlib is installed)
+          confusion_/per_class_/per_zone_/roc_/pr_<split>.png, valid_vs_test.png   result figures
 
 Metrics (all computed only where the label is known, see build_zone_dataset.py):
   per class : Accuracy, Precision, Recall, F1, Balanced accuracy, AUC, TP/FP/TN/FN
@@ -411,6 +412,8 @@ def main():
         res_patch = evaluate(Y, P, Z, th, ["patch"]) if (Z == ZONES.index("patch")).any() else None
         res["patch"] = res_patch["overall"] if res_patch else None
         res["best_epoch"] = ckpt["epoch"]
+        np.savez_compressed(run / f"preds_{s}.npz", Y=Y, P=P, Z=Z,
+                            face_idx=np.array([ZONES.index(z) for z in FACE_ZONES]))
         (run / f"metrics_{s}.json").write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding="utf-8")
         write_report(run / f"report_{s}.md", res, res_patch, s, args, args.target)
 
@@ -425,6 +428,11 @@ def main():
         fig.tight_layout(); fig.savefig(run / "curves.png", dpi=120)
     except Exception as exc:
         print("curves.png skipped:", exc)
+    try:
+        from plot_results import plot_all
+        print("figures:", ", ".join(plot_all(run, args.target)))
+    except Exception as exc:
+        print("result figures skipped:", exc)
 
     print("\n" + (run / "report_test.md").read_text(encoding="utf-8"))
     print(f"Run folder: {run}\nDeploy: copy {run / 'best.pt'} to ai-service/models/zone_classifier.pt")
