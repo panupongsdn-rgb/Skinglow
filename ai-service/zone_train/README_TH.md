@@ -32,10 +32,14 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 ## 2. สร้าง dataset รายโซน (ประมาณ 5–10 นาที)
 
+รันใน **Command Prompt (cmd)** ที่โฟลเดอร์ `skinglow-trian` (ถ้าใช้ PowerShell ให้พิมพ์ `cmd` ก่อน เพราะ `%REPO%` ใช้ได้เฉพาะใน cmd)
+
 ```bat
-set REPO=E:\path\to\Skinglow
-python "%REPO%\ai-service\zone_train\build_zone_dataset.py" --data-root "E:\Project END\Sangmai\skinglow-trian\dataset_clean_v2" --out zone_dataset
+cd /d "E:\Project END\Sangmai\skinglow-trian"
+set REPO=E:\Project END\Sangmai\skinglow-trian\skinglow_zone
+python "%REPO%\zone_train\build_zone_dataset.py" --data-root dataset_clean_v2 --out zone_dataset
 ```
+(`REPO` คือโฟลเดอร์ที่มี `face_zones.py` และ `zone_train\` ถ้าใช้ repo จาก GitHub ให้ชี้ไปที่ `...\Skinglow\ai-service`)
 
 เมื่อรันเสร็จจะได้ไฟล์เหล่านี้:
 - `zone_dataset\labels.csv` เก็บ 1 แถวต่อ 1 ครอป พร้อม label ของ 6 คลาส (1 = มี, 0 = ไม่มี, -1 = ไม่ทราบ)
@@ -60,7 +64,7 @@ python "%REPO%\ai-service\zone_train\build_zone_dataset.py" --data-root "E:\Proj
 ## 3. เทรน + วัดผล (RTX 3070 ประมาณ 20–40 นาที)
 
 ```bat
-python "%REPO%\ai-service\zone_train\train_zone_classifier.py" --data zone_dataset --arch efficientnet_b0 --epochs 40 --batch 64 --workers 4
+python "%REPO%\zone_train\train_zone_classifier.py" --data zone_dataset --arch efficientnet_b0 --epochs 40 --batch 64 --workers 4
 ```
 
 ผลลัพธ์จะอยู่ใน `runs_zone\<ชื่อรัน>\`
@@ -142,7 +146,7 @@ review_labels.bat
 ## 4. นำไปใช้ในแอป
 
 ```bat
-copy runs_zone\<ชื่อรัน>\best.pt "%REPO%\ai-service\models\zone_classifier.pt"
+copy runs_zone\<ชื่อรัน>\best.pt "<โฟลเดอร์ repo Skinglow>\ai-service\models\zone_classifier.pt"
 ```
 
 - `main.py` จะโหลดไฟล์นี้อัตโนมัติ ตรวจสอบได้ที่ `/health` ซึ่งต้องขึ้น `"zone_model_type": "zone_classifier"`
