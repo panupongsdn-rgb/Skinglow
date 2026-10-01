@@ -1335,7 +1335,7 @@ async function submitForAnalysis(file, mirrored = false) {
     } catch {
       throw new Error(`API error ${res.status} (no response body)`);
     }
-    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+    if (!res.ok || !json.success) throw new Error(`API error ${res.status}: ` + (json.message || '') + (json.detail ? ` (${json.detail})` : ''));
     renderResults(json.data);
   } catch (err) {
     console.error('Analysis failed:', err);
@@ -1354,6 +1354,11 @@ async function submitForAnalysis(file, mirrored = false) {
   }
 }
 
+
+/* Wake the AI service (Render free tier sleeps after 15 min) as soon as the page
+   opens, so it is usually awake by the time the user picks a photo. */
+const AI_WARMUP_URL = 'https://skinglow-ai-service.onrender.com/health';
+try { fetch(AI_WARMUP_URL, { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch (e) {}
 
 /* ------------------------------------------------------------
    Render results
@@ -1533,7 +1538,7 @@ async function fetchRealHistory() {
       return [];
     }
     const json = await res.json();
-    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+    if (!res.ok || !json.success) throw new Error(`API error ${res.status}: ` + (json.message || '') + (json.detail ? ` (${json.detail})` : ''));
 
     return json.data
       .map(row => ({

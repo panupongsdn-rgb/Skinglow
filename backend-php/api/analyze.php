@@ -97,7 +97,10 @@ $ch = curl_init(AI_SERVICE_URL);
 curl_setopt_array($ch, [
     CURLOPT_POST           => true,
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 30,
+    // Render free tier sleeps after 15 min; waking up + loading the models can take ~50 s.
+    // InfinityFree stops PHP at 60 s, so wait up to 55 s.
+    CURLOPT_CONNECTTIMEOUT => 20,
+    CURLOPT_TIMEOUT        => 55,
     CURLOPT_POSTFIELDS     => [
         'file'     => new CURLFile($originalPath, $actualMime, $uniqueName),
         // front-camera captures are mirrored; the AI needs it to name left/right cheeks correctly
