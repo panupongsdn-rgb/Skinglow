@@ -26,14 +26,19 @@ header('Content-Type: application/json; charset=utf-8');
 $userId = Auth::requireAuth();
 
 $pdo = getDbConnection();
-$stmt = $pdo->prepare(
-    'SELECT id, original_image_path, processed_image_path, skin_score, detections_json, summary, created_at
+$historySql = 'SELECT id, original_image_path, processed_image_path, skin_score, detections_json, %s summary, created_at
      FROM analysis_history
      WHERE user_id = :user_id
      ORDER BY created_at DESC
-     LIMIT 50'
-);
-$stmt->execute([':user_id' => $userId]);
+     LIMIT 50';
+try {
+    $stmt = $pdo->prepare(sprintf($historySql, 'zones_json,'));
+    $stmt->execute([':user_id' => $userId]);
+} catch (PDOException $e) {
+    // zones_json column not added yet (database/migration_add_zones_json.sql)
+    $stmt = $pdo->prepare(sprintf($historySql, ''));
+    $stmt->execute([':user_id' => $userId]);
+}
 $rows = $stmt->fetchAll();
 
 // Build full URLs (DB stores relative paths) and decode detections for the
@@ -44,6 +49,7 @@ $data = array_map(function ($row) {
         'skin_score'      => $row['skin_score'] !== null ? (float) $row['skin_score'] : null,
         'summary'         => $row['summary'],
         'detections'      => json_decode($row['detections_json'] ?? '[]', true) ?: [],
+        'zones'           => json_decode($row['zones_json'] ?? '[]', true) ?: [],
         'original_image'  => APP_BASE_URL . '/' . ltrim($row['original_image_path'], '/'),
         'processed_image' => APP_BASE_URL . '/' . ltrim($row['processed_image_path'], '/'),
         'created_at'      => $row['created_at'],

@@ -200,6 +200,26 @@
     color:var(--ink-soft);
   }
 
+  /* ---- per-zone results (forehead / cheeks / nose / under-eye / chin) ---- */
+  .zone-block{margin-bottom:28px;}
+  .zone-title{font-size:1rem; color:var(--sage-deep); margin-bottom:10px;}
+  .zone-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;}
+  .zone-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  }
+  .zone-card .z-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}
+  .zone-card .z-name{font-weight:700; font-size:.9rem; color:var(--ink);}
+  .zone-card .z-score{font-family:'Fraunces',serif; font-size:1.15rem; color:var(--sage-deep);}
+  .zone-card .z-bar{height:6px; border-radius:999px; background:var(--line); margin:8px 0 10px; overflow:hidden;}
+  .zone-card .z-bar span{display:block; height:100%; border-radius:999px;
+    background:linear-gradient(90deg, var(--blush-deep), var(--sage));}
+  .zone-card .z-issues{display:flex; flex-wrap:wrap; gap:5px;}
+  .zone-card .z-issue{
+    font-size:.72rem; padding:3px 8px; border-radius:999px; color:#fff; white-space:nowrap;
+  }
+  .zone-card .z-clear{font-size:.76rem; color:var(--ink-soft);}
+  .zone-note{font-size:.72rem; color:var(--ink-soft); margin-top:8px;}
+
   h2.section-title{font-size:1.4rem; color:var(--sage-deep); margin-bottom:4px;}
   .section-sub{color:var(--ink-soft); font-size:.9rem; margin-bottom:18px;}
 
@@ -991,6 +1011,12 @@ main{
 
         <div class="issue-chips" id="issueChips"></div>
 
+        <div class="zone-block" id="zoneBlock" style="display:none;">
+          <h3 class="zone-title">ผลวิเคราะห์แยกตามส่วนของใบหน้า</h3>
+          <div class="zone-grid" id="zoneGrid"></div>
+          <p class="zone-note" id="zoneNote"></p>
+        </div>
+
         <h2 class="section-title" style="font-size:1.1rem;">ผลิตภัณฑ์แนะนำสำหรับคุณ</h2>
         <p class="section-sub">คัดเลือกตามปัญหาผิวที่ตรวจพบ</p>
         <div class="products" id="productList"></div>
@@ -1258,7 +1284,7 @@ function capturePhoto() {
       return;
     }
     stopCamera();
-    handleImageFile(new File([blob], 'capture.jpg', { type: 'image/jpeg' }));
+    handleImageFile(new File([blob], 'capture.jpg', { type: 'image/jpeg' }), MIRROR_FRONT_CAMERA);
   }, 'image/jpeg', 0.92);
 }
 
@@ -1271,19 +1297,22 @@ function stopCamera() {
 /* ------------------------------------------------------------
    Handle chosen/captured image -> preview -> send to API
 ------------------------------------------------------------- */
-function handleImageFile(file) {
+// mirrored: the photo was flipped like a mirror (front-camera capture), which
+// the AI needs to tell the left cheek from the right one.
+function handleImageFile(file, mirrored = false) {
   dropZone.style.display = 'none';
   previewImg.src = URL.createObjectURL(file);
   previewImg.style.display = 'block';
-  submitForAnalysis(file);
+  submitForAnalysis(file, mirrored);
 }
 
-async function submitForAnalysis(file) {
+async function submitForAnalysis(file, mirrored = false) {
   scanPanel.classList.add('scanning');
   resultsSection.style.display = 'none';
 
   const formData = new FormData();
   formData.append('image', file);
+  formData.append('mirrored', mirrored ? '1' : '0');
 
   try {
     const res = await fetch(API_ANALYZE_URL, {
@@ -1350,6 +1379,8 @@ function renderResults(data) {
     issueChips.appendChild(chip);
   });
 
+  renderZones(data.zones || [], data.zone_model_type);
+
   productList.innerHTML = '';
   (data.recommended_products || []).forEach(p => {
     const card = document.createElement('div');
@@ -1367,6 +1398,53 @@ function renderResults(data) {
   resultsSection.scrollIntoView({ behavior: 'smooth' });
 
   pushToHistory(data);
+}
+
+/* ------------------------------------------------------------
+   Per-zone results: the face is split into forehead, both cheeks,
+   nose, under-eye and chin, and each zone is analysed on its own.
+------------------------------------------------------------- */
+const ZONE_ORDER = ['forehead', 'left_cheek', 'right_cheek', 'nose', 'under_eye', 'chin'];
+const zoneBlock = document.getElementById('zoneBlock');
+const zoneGrid  = document.getElementById('zoneGrid');
+const zoneNote  = document.getElementById('zoneNote');
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function renderZones(zones, zoneModelType) {
+  zoneGrid.innerHTML = '';
+  if (!zones.length) {
+    zoneBlock.style.display = 'none';
+    return;
+  }
+  zoneBlock.style.display = 'block';
+  const sorted = [...zones].sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone));
+  sorted.forEach(z => {
+    const score = Math.round(z.score ?? 0);
+    const issues = (z.issues || []).map(i => {
+      const color = BOX_COLORS[i.label] || '#7A6C8E';
+      const pct = Math.round((i.probability ?? 0) * 100);
+      return `<span class="z-issue" style="background:${color}">${escapeHtml(i.label_th || i.label)} ${pct}%</span>`;
+    }).join('');
+    const card = document.createElement('div');
+    card.className = 'zone-card';
+    card.innerHTML = `
+      <div class="z-head">
+        <span class="z-name">${escapeHtml(z.name_th || z.zone)}</span>
+        <span class="z-score">${score}</span>
+      </div>
+      <div class="z-bar"><span style="width:${Math.max(0, Math.min(100, score))}%"></span></div>
+      <div class="z-issues">${issues || '<span class="z-clear">ไม่พบปัญหาชัดเจน</span>'}</div>
+    `;
+    zoneGrid.appendChild(card);
+  });
+  zoneNote.textContent = zoneModelType === 'zone_classifier'
+    ? 'วิเคราะห์ด้วยโมเดลจำแนกรายโซน · % คือความมั่นใจของโมเดล'
+    : 'วิเคราะห์จากจุดที่ตรวจพบในแต่ละโซน · % คือความมั่นใจของโมเดล';
 }
 
 /* ================================================================

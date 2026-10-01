@@ -99,7 +99,9 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_TIMEOUT        => 30,
     CURLOPT_POSTFIELDS     => [
-        'file' => new CURLFile($originalPath, $actualMime, $uniqueName),
+        'file'     => new CURLFile($originalPath, $actualMime, $uniqueName),
+        // front-camera captures are mirrored; the AI needs it to name left/right cheeks correctly
+        'mirrored' => (($_POST['mirrored'] ?? '0') === '1') ? 'true' : 'false',
     ],
 ]);
 
@@ -122,6 +124,7 @@ if (!is_array($aiResult) || !isset($aiResult['detections'])) {
 }
 
 $detections = $aiResult['detections'];   // e.g. [{box, label, confidence}, ...]
+$zones      = $aiResult['zones'] ?? [];  // [{zone, name_th, score, issues:[{label, label_th, probability}], polygons, box}, ...]
 $skinScore  = $aiResult['skin_score'] ?? null;
 $skinStatus = $aiResult['skin_status'] ?? 'issues_found'; // 'clear' | 'issues_found' | 'no_face_detected'
 $faceDetected = $aiResult['face_detected'] ?? true;
@@ -137,7 +140,7 @@ if ($skinStatus === 'no_face_detected') {
 // 4. Draw bounding boxes onto a copy of the image (GD library)
 // ---------------------------------------------------------------
 $processedPath = UPLOAD_PROCESSED_DIR . $uniqueName;
-$drawSuccess = BoundingBoxDrawer::draw($originalPath, $detections, $processedPath);
+$drawSuccess = BoundingBoxDrawer::draw($originalPath, $detections, $processedPath, $zones);
 
 if (!$drawSuccess) {
     // Not fatal - fall back to the original image if drawing failed
@@ -152,30 +155,65 @@ foreach ($detections as $d) {
     $label = $d['label'] ?? 'unknown';
     $issueCounts[$label] = ($issueCounts[$label] ?? 0) + 1;
 }
-$summaryParts = [];
-foreach ($issueCounts as $label => $count) {
-    $summaryParts[] = "{$label} x{$count}";
+
+// Conditions found by the per-zone analysis count too (a zone can report a
+// condition even when no individual box was drawn for it).
+$zoneParts = [];
+foreach ($zones as $z) {
+    $names = [];
+    foreach (($z['issues'] ?? []) as $issue) {
+        $label = $issue['label'] ?? null;
+        if ($label === null) {
+            continue;
+        }
+        $issueCounts[$label] = $issueCounts[$label] ?? 0;
+        $names[] = $issue['label_th'] ?? $label;
+    }
+    if ($names) {
+        $zoneParts[] = ($z['name_th'] ?? $z['zone']) . ': ' . implode(', ', $names);
+    }
 }
-$summary = $summaryParts
-    ? implode(', ', $summaryParts)
-    : ($skinStatus === 'clear' ? 'ผิวคุณดูใสสะอาด ไม่พบปัญหาที่ชัดเจน 🎉' : 'ไม่พบปัญหาผิวที่ชัดเจน');
+
+if ($zoneParts) {
+    $summary = implode(' · ', $zoneParts);
+} elseif ($issueCounts) {
+    $summaryParts = [];
+    foreach ($issueCounts as $label => $count) {
+        $summaryParts[] = "{$label} x{$count}";
+    }
+    $summary = implode(', ', $summaryParts);
+} else {
+    $summary = $skinStatus === 'clear' ? 'ผิวคุณดูใสสะอาด ไม่พบปัญหาที่ชัดเจน 🎉' : 'ไม่พบปัญหาผิวที่ชัดเจน';
+}
 
 $pdo = getDbConnection();
 
-$stmt = $pdo->prepare(
-    'INSERT INTO analysis_history
-        (user_id, original_image_path, processed_image_path, skin_score, detections_json, summary)
-     VALUES (:user_id, :original_path, :processed_path, :skin_score, :detections_json, :summary)'
-);
-
-$stmt->execute([
+$params = [
     ':user_id'         => $userId,
     ':original_path'   => 'uploads/original/' . $uniqueName,
     ':processed_path'  => 'uploads/processed/' . basename($processedPath),
     ':skin_score'      => $skinScore,
     ':detections_json' => json_encode($detections, JSON_UNESCAPED_UNICODE),
     ':summary'         => $summary,
-]);
+];
+
+try {
+    $stmt = $pdo->prepare(
+        'INSERT INTO analysis_history
+            (user_id, original_image_path, processed_image_path, skin_score, detections_json, zones_json, summary)
+         VALUES (:user_id, :original_path, :processed_path, :skin_score, :detections_json, :zones_json, :summary)'
+    );
+    $stmt->execute($params + [':zones_json' => json_encode($zones, JSON_UNESCAPED_UNICODE)]);
+} catch (PDOException $e) {
+    // Database not migrated yet (no zones_json column, see
+    // database/migration_add_zones_json.sql): save without the zones.
+    $stmt = $pdo->prepare(
+        'INSERT INTO analysis_history
+            (user_id, original_image_path, processed_image_path, skin_score, detections_json, summary)
+         VALUES (:user_id, :original_path, :processed_path, :skin_score, :detections_json, :summary)'
+    );
+    $stmt->execute($params);
+}
 
 $analysisId = (int) $pdo->lastInsertId();
 
@@ -217,6 +255,8 @@ respond(200, [
         'skin_status'      => $skinStatus,
         'summary'          => $summary,
         'detections'       => $detections,
+        'zones'            => $zones,
+        'zone_model_type'  => $aiResult['zone_model_type'] ?? 'none',
         'original_image'   => APP_BASE_URL . '/uploads/original/' . $uniqueName,
         'processed_image'  => APP_BASE_URL . '/uploads/processed/' . basename($processedPath),
         'recommended_products' => $recommendedProducts,
