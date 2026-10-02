@@ -50,6 +50,11 @@ define('AI_SERVICE_URL', getenv('AI_SERVICE_URL')
     ?: ((isLocalRequest() ? (localSecrets()['ai_service_url'] ?? '') : '')
         ?: 'https://skinglow-ai-service.onrender.com/analyze'));
 
+// When a local AI service is configured but not running, analyze.php retries on Render.
+define('AI_SERVICE_FALLBACK_URL',
+    AI_SERVICE_URL !== 'https://skinglow-ai-service.onrender.com/analyze' && isLocalRequest()
+        ? 'https://skinglow-ai-service.onrender.com/analyze' : '');
+
 // Upload constraints
 define('MAX_UPLOAD_SIZE', 8 * 1024 * 1024); // 8 MB
 define('ALLOWED_MIME_TYPES', ['image/jpeg', 'image/png', 'image/webp']);
