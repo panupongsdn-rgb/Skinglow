@@ -453,8 +453,22 @@
   line-height:1.5;
   padding-right:45px;
 }
+/* per-zone details in the history popup */
+.history-modal-zones{margin-top:14px;}
+.history-modal-zones-title{font-size:.92rem; color:var(--sage-deep); margin:0 0 10px;}
+.history-modal-zones .zone-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+.history-modal-content.has-zones{width:min(96vw, 1180px);}
+@media (min-width:861px){
+  .history-modal-content.has-zones{flex-direction:row; height:min(88vh, 760px);}
+  .history-modal-content.has-zones .history-modal-image-wrap{flex:1 1 auto; height:auto; min-width:0;}
+  .history-modal-content.has-zones .history-modal-info{
+    flex:0 0 380px; overflow-y:auto; border-top:none; border-left:1px solid var(--line); padding-top:56px;
+  }
+}
 /* ---------- Mobile ---------- */
 @media (max-width:860px){
+  .history-modal-content.has-zones{overflow-y:auto;}
+  .history-modal-content.has-zones .history-modal-image-wrap{height:46vh; flex:0 0 auto;}
   .history-image-modal{
     padding:10px;
   }
@@ -1138,6 +1152,11 @@ main{
         class="history-modal-summary"
         id="historyModalSummary"
       ></div>
+      <div class="history-modal-zones" id="historyModalZones" hidden>
+        <h4 class="history-modal-zones-title">ผลวิเคราะห์แยกตามส่วนของใบหน้า</h4>
+        <div class="zone-grid" id="historyModalZoneGrid"></div>
+        <p class="zone-note">ตัวเลขมุมขวาคือคะแนนของโซน (100 = ไม่พบปัญหา) · % คือความมั่นใจของโมเดล</p>
+      </div>
     </div>
   </div>
 </div>
@@ -1420,14 +1439,10 @@ function escapeHtml(text) {
   }[c]));
 }
 
-function renderZones(zones, zoneModelType) {
-  zoneGrid.innerHTML = '';
-  if (!zones.length) {
-    zoneBlock.style.display = 'none';
-    return;
-  }
-  zoneBlock.style.display = 'block';
-  const sorted = [...zones].sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone));
+/** Builds the per-zone cards (forehead / cheeks / nose / under-eye / chin) into `grid`. */
+function buildZoneCards(grid, zones) {
+  grid.innerHTML = '';
+  const sorted = [...(zones || [])].sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone));
   sorted.forEach(z => {
     const score = Math.round(z.score ?? 0);
     const issues = (z.issues || []).map(i => {
@@ -1445,8 +1460,31 @@ function renderZones(zones, zoneModelType) {
       <div class="z-bar"><span style="width:${Math.max(0, Math.min(100, score))}%"></span></div>
       <div class="z-issues">${issues || '<span class="z-clear">ไม่พบปัญหาชัดเจน</span>'}</div>
     `;
-    zoneGrid.appendChild(card);
+    grid.appendChild(card);
   });
+}
+
+/** One-line summary from the zone results, e.g. "สิว: คาง · จุดด่างดำ: แก้มซ้าย, แก้มขวา". */
+function summaryFromZones(zones) {
+  const byIssue = {};
+  [...(zones || [])]
+    .sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone))
+    .forEach(z => (z.issues || []).forEach(i => {
+      const key = i.label_th || i.label;
+      (byIssue[key] = byIssue[key] || []).push(z.name_th || z.zone);
+    }));
+  const parts = Object.entries(byIssue).map(([issue, names]) => `${issue}: ${names.join(', ')}`);
+  return parts.length ? parts.join(' · ') : 'ไม่พบปัญหาผิวที่ชัดเจนในทุกโซน';
+}
+
+function renderZones(zones, zoneModelType) {
+  if (!zones.length) {
+    zoneGrid.innerHTML = '';
+    zoneBlock.style.display = 'none';
+    return;
+  }
+  zoneBlock.style.display = 'block';
+  buildZoneCards(zoneGrid, zones);
   zoneNote.textContent = zoneModelType === 'zone_classifier'
     ? 'วิเคราะห์ด้วยโมเดลจำแนกรายโซน · % คือความมั่นใจของโมเดล'
     : 'วิเคราะห์จากจุดที่ตรวจพบในแต่ละโซน · % คือความมั่นใจของโมเดล';
@@ -1512,6 +1550,7 @@ function pushToHistory(data) {
     label: 'สแกนของคุณ',
     skin_score: data.skin_score,
     counts: detectionsToCounts(data.detections),
+    zones: data.zones || [],
     image: data.processed_image,
     isReal: true,
   });
@@ -1547,6 +1586,7 @@ async function fetchRealHistory() {
         label: new Date(row.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
         skin_score: row.skin_score,
         counts: detectionsToCounts(row.detections),
+        zones: row.zones || [],
         image: row.processed_image,
         isReal: true,
       }))
@@ -1671,7 +1711,9 @@ function renderHistoryList() {
            e.skin_score !== undefined)
             ? Math.round(e.skin_score)
             : '—';
-        const summary = summaryFromCounts(e.counts);
+        const summary = (e.zones && e.zones.length)
+          ? summaryFromZones(e.zones)
+          : summaryFromCounts(e.counts);
         return `
           <div
             class="history-row"
@@ -2082,6 +2124,12 @@ const historyModalDate =
   document.getElementById('historyModalDate');
 const historyModalSummary =
   document.getElementById('historyModalSummary');
+const historyModalZones =
+  document.getElementById('historyModalZones');
+const historyModalZoneGrid =
+  document.getElementById('historyModalZoneGrid');
+const historyModalContent =
+  historyImageModal.querySelector('.history-modal-content');
 /* ---------------------------------------------------------------
    Zoom state
 ---------------------------------------------------------------- */
@@ -2141,8 +2189,17 @@ function openHistoryImageModal(entry) {
       : '—';
   historyModalDate.textContent =
     `${dateStr} • คะแนนผิว ${scoreStr}`;
-  historyModalSummary.textContent =
-    summaryFromCounts(entry.counts);
+  const hasZones = Array.isArray(entry.zones) && entry.zones.length > 0;
+  historyModalSummary.textContent = hasZones
+    ? summaryFromZones(entry.zones)
+    : summaryFromCounts(entry.counts);
+  if (hasZones) {
+    buildZoneCards(historyModalZoneGrid, entry.zones);
+  } else {
+    historyModalZoneGrid.innerHTML = '';
+  }
+  historyModalZones.hidden = !hasZones;
+  historyModalContent.classList.toggle('has-zones', hasZones);
   resetHistoryImageZoom();
   historyImageModal.classList.add('open');
   historyImageModal.setAttribute(
