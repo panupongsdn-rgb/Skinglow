@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/BoundingBoxDrawer.php';
+require_once __DIR__ . '/../src/ZoneDetections.php';
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/ImageOrientation.php';
 
@@ -140,6 +141,11 @@ if (!is_array($aiResult) || !isset($aiResult['detections'])) {
 
 $detections = $aiResult['detections'];   // e.g. [{box, label, confidence}, ...]
 $zones      = $aiResult['zones'] ?? [];  // [{zone, name_th, score, issues:[{label, label_th, probability}], polygons, box}, ...]
+// With the per-zone classifier, the boxes follow its results: YOLO boxes that
+// disagree with their zone are dropped, zone problems without a box get one.
+if (($aiResult['zone_model_type'] ?? '') === 'zone_classifier' && $zones) {
+    $detections = ZoneDetections::reconcile($detections, $zones);
+}
 $skinScore  = $aiResult['skin_score'] ?? null;
 $skinStatus = $aiResult['skin_status'] ?? 'issues_found'; // 'clear' | 'issues_found' | 'no_face_detected'
 $faceDetected = $aiResult['face_detected'] ?? true;
