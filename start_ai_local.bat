@@ -12,11 +12,9 @@ if not exist venv\Scripts\python.exe (
     echo [setup] creating Python virtual environment in ai-service\venv ...
     py -3.9 -m venv venv 2>nul || python -m venv venv || goto :error
     venv\Scripts\python -m pip install --upgrade pip
-    echo [setup] installing PyTorch CPU ...
-    venv\Scripts\python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu || goto :error
 )
 
-venv\Scripts\python -c "import mediapipe, ensemble_boxes, torchvision, ultralytics, fastapi, uvicorn, multipart; assert ultralytics.__version__ == '8.4.118'" 2>nul
+venv\Scripts\python -c "import mediapipe, onnxruntime, fastapi, uvicorn, multipart" 2>nul
 if errorlevel 1 (
     echo [setup] installing / updating packages from requirements.txt ...
     venv\Scripts\python -m pip install -r requirements.txt || goto :error
