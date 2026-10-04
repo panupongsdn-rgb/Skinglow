@@ -142,6 +142,19 @@
     position:absolute; bottom:5%; left:50%; transform:translateX(-50%);
     z-index:4;
   }
+  /* retake: shown on the photo once one has been picked, so the user can try
+     again without reloading the page */
+  .retake-bar{
+    position:absolute; bottom:5%; left:50%; transform:translateX(-50%);
+    z-index:4; gap:8px; flex-wrap:nowrap;
+  }
+  .retake-bar .btn, .cancel-camera-btn{width:auto; min-height:0; padding:9px 16px; font-size:.82rem; white-space:nowrap;}
+  .retake-bar .btn.ghost, .cancel-camera-btn{background:rgba(255,255,255,.92);}
+  .retake-bar .btn.ghost:hover, .cancel-camera-btn:hover{background:var(--sage-deep); color:#fff;}
+  .cancel-camera-btn{position:absolute; top:5%; right:5%; z-index:4;}
+  .scanning .retake-bar, .scanning .cancel-camera-btn{display:none !important;}
+  .result-actions{display:flex; gap:10px; flex-wrap:wrap; margin:-4px 0 6px;}
+  .result-actions .btn{width:auto;}
   .btn{
     display:inline-flex; align-items:center; gap:8px;
     background:linear-gradient(120deg, var(--sage), var(--blush-deep)); color:#fff; border:none; border-radius:999px;
@@ -998,12 +1011,25 @@ main{
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="4"/><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" stroke-linejoin="round"/></svg>
         ถ่ายภาพ
       </button>
+      <button class="btn ghost cancel-camera-btn" id="cancelCameraBtn" type="button" style="display:none;">ยกเลิก</button>
+
+      <div class="retake-bar" id="retakeBar" style="display:none;">
+        <button class="btn" id="retakeCameraBtn" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          ถ่ายใหม่
+        </button>
+        <button class="btn ghost" id="retakeUploadBtn" type="button">เลือกรูปอื่น</button>
+      </div>
     </div>
   </section>
 
   <section id="results">
     <h2 class="section-title">ผลการวิเคราะห์ผิว</h2>
     <p class="section-sub" id="resultSummary">—</p>
+    <div class="result-actions">
+      <button class="btn" id="resultRetakeBtn" type="button">ถ่ายภาพใหม่</button>
+      <button class="btn ghost" id="resultUploadBtn" type="button">เลือกรูปอื่น</button>
+    </div>
 
     <div class="results-grid">
       <div>
@@ -1219,6 +1245,8 @@ const cameraVideo = document.getElementById('camera-video');
 const uploadBtn   = document.getElementById('uploadBtn');
 const cameraBtn   = document.getElementById('cameraBtn');
 const captureBtn  = document.getElementById('captureBtn');
+const cancelCameraBtn = document.getElementById('cancelCameraBtn');
+const retakeBar       = document.getElementById('retakeBar');
 
 const resultsSection = document.getElementById('results');
 const resultImage    = document.getElementById('resultImage');
@@ -1238,6 +1266,7 @@ dropZone.addEventListener('click', (e) => { if (e.target === dropZone) fileInput
 
 fileInput.addEventListener('change', () => {
   if (fileInput.files[0]) handleImageFile(fileInput.files[0]);
+  fileInput.value = '';  // so choosing the same file again still triggers 'change'
 });
 
 ['dragover','dragleave','drop'].forEach(evt => {
@@ -1267,18 +1296,61 @@ captureBtn.addEventListener('click', capturePhoto);
 const MIRROR_FRONT_CAMERA = true;
 
 async function openCamera() {
+  if (scanPanel.classList.contains('scanning')) return;
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    if (!cameraStream || !cameraStream.active) {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    }
     cameraVideo.srcObject = cameraStream;
     cameraVideo.classList.toggle('mirrored', MIRROR_FRONT_CAMERA);
     cameraVideo.style.display = 'block';
     previewImg.style.display = 'none';
     dropZone.style.display = 'none';
+    retakeBar.style.display = 'none';
     captureBtn.style.display = 'inline-flex';
+    cancelCameraBtn.style.display = 'inline-flex';
   } catch (err) {
     alert('ไม่สามารถเข้าถึงกล้องได้: ' + err.message);
   }
 }
+
+/* ------------------------------------------------------------
+   Retake — try again with a new photo without reloading the page.
+   The old result is replaced as soon as the new photo is analysed.
+------------------------------------------------------------- */
+let hasPhoto = false;  // a photo is in the panel (being analysed or analysed)
+
+function showIdleOrPhoto() {
+  // back to whatever the panel showed before the camera was opened
+  if (hasPhoto) {
+    previewImg.style.display = 'block';
+    retakeBar.style.display = 'flex';
+  } else {
+    dropZone.style.display = 'block';
+  }
+}
+
+function cancelCamera() {
+  stopCamera();
+  showIdleOrPhoto();
+}
+
+function pickAnotherFile() {
+  if (scanPanel.classList.contains('scanning')) return;
+  fileInput.value = '';
+  fileInput.click();
+}
+
+function retakeFromResults(useCamera) {
+  scanPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (useCamera) openCamera(); else pickAnotherFile();
+}
+
+cancelCameraBtn.addEventListener('click', cancelCamera);
+document.getElementById('retakeCameraBtn').addEventListener('click', openCamera);
+document.getElementById('retakeUploadBtn').addEventListener('click', pickAnotherFile);
+document.getElementById('resultRetakeBtn').addEventListener('click', () => retakeFromResults(true));
+document.getElementById('resultUploadBtn').addEventListener('click', () => retakeFromResults(false));
 
 function capturePhoto() {
   if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) {
@@ -1309,8 +1381,10 @@ function capturePhoto() {
 
 function stopCamera() {
   if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+  cameraStream = null;
   cameraVideo.style.display = 'none';
   captureBtn.style.display = 'none';
+  cancelCameraBtn.style.display = 'none';
 }
 
 /* ------------------------------------------------------------
@@ -1319,9 +1393,14 @@ function stopCamera() {
 // mirrored: the photo was flipped like a mirror (front-camera capture), which
 // the AI needs to tell the left cheek from the right one.
 function handleImageFile(file, mirrored = false) {
+  if (scanPanel.classList.contains('scanning')) return;  // one analysis at a time
+  if (cameraStream) stopCamera();
   dropZone.style.display = 'none';
+  retakeBar.style.display = 'none';
+  if (previewImg.src && previewImg.src.startsWith('blob:')) URL.revokeObjectURL(previewImg.src);
   previewImg.src = URL.createObjectURL(file);
   previewImg.style.display = 'block';
+  hasPhoto = true;
   submitForAnalysis(file, mirrored);
 }
 
@@ -1368,8 +1447,10 @@ async function submitForAnalysis(file, mirrored = false) {
     );
     dropZone.style.display = 'block';
     previewImg.style.display = 'none';
+    hasPhoto = false;
   } finally {
     scanPanel.classList.remove('scanning');
+    if (hasPhoto) retakeBar.style.display = 'flex';
   }
 }
 
