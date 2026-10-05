@@ -154,6 +154,14 @@
   .cancel-camera-btn{position:absolute; top:5%; right:5%; z-index:4;}
   .scanning .retake-bar, .scanning .cancel-camera-btn{display:none !important;}
   .result-actions{display:flex; gap:10px; flex-wrap:wrap; margin:-4px 0 6px;}
+  /* the mobile rule ".btn{width:100%}" further down must not stretch the
+     buttons that float over the camera / photo: keep them compact pills */
+  .scan-panel .cancel-camera-btn{
+    width:auto; min-height:0; top:12px; right:12px; left:auto;
+    padding:7px 14px; font-size:.8rem; line-height:1.2;
+  }
+  .scan-panel .capture-btn{width:auto; min-width:150px; white-space:nowrap; padding:11px 24px;}
+  .scan-panel .retake-bar .btn{width:auto; min-height:0;}
   .result-actions .btn{width:auto;}
   .btn{
     display:inline-flex; align-items:center; gap:8px;
