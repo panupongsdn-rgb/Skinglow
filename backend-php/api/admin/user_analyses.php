@@ -8,9 +8,9 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__ . '../backend-php/config/config.php';
-require_once __DIR__ . '../backend-php/config/database.php';
-require_once __DIR__ . '../backend-php/src/Auth.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../src/Auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -50,8 +50,8 @@ $data = array_map(function ($row) {
         'skin_score'      => $row['skin_score'] !== null ? (float) $row['skin_score'] : null,
         'summary'         => $row['summary'],
         'detections'      => json_decode($row['detections_json'] ?? '[]', true) ?: [],
-        'original_image'  => APP_BASE_URL . '/' . ltrim($row['original_image_path'], '/'),
-        'processed_image' => APP_BASE_URL . '/' . ltrim($row['processed_image_path'], '/'),
+        'original_image'  => $row['original_image_path'] ? APP_BASE_URL . '/' . ltrim($row['original_image_path'], '/') : null,
+        'processed_image' => $row['processed_image_path'] ? APP_BASE_URL . '/' . ltrim($row['processed_image_path'], '/') : null,
         'created_at'      => $row['created_at'],
     ];
 }, $rows);
