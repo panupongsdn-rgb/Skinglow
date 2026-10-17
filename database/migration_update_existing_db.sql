@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
     CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE KEY uq_reset_token (token_hash),
     KEY idx_reset_user_created (user_id, created_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. admin "insights" articles
 CREATE TABLE IF NOT EXISTS daily_insights (
@@ -34,4 +34,4 @@ CREATE TABLE IF NOT EXISTS daily_insights (
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_daily_insights_date (publish_date),
     KEY idx_daily_insights_active (is_active)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

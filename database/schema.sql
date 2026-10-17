@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
                                      ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
 -- Table: analysis_history
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS analysis_history (
     CONSTRAINT fk_analysis_user
         FOREIGN KEY (user_id) REFERENCES users(id)
         ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
 -- Table: products
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS products (
     image_url       VARCHAR(255) DEFAULT NULL,
     purchase_url    VARCHAR(255) DEFAULT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
 -- Table: password_resets  (forgot / reset password links)
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
         ON DELETE CASCADE,
     UNIQUE KEY uq_reset_token (token_hash),
     KEY idx_reset_user_created (user_id, created_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
 -- Table: daily_insights  (admin "insights" articles)
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS daily_insights (
                                      ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_daily_insights_date (publish_date),
     KEY idx_daily_insights_active (is_active)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX idx_products_target_issue ON products(target_issue);
 CREATE INDEX idx_analysis_user ON analysis_history(user_id);
