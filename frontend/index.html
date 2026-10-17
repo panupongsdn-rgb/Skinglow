@@ -294,6 +294,16 @@
   .history-row .h-score{
     font-family:'Fraunces',serif; font-size:1.15rem; color:var(--sage-deep); flex-shrink:0; min-width:44px; text-align:right;
   }
+/* delete button on each history row (own, real scans only) */
+.history-row .h-delete{
+  flex-shrink:0; width:34px; height:34px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent; border:1px solid var(--line); color:#B0546A;
+  cursor:pointer; font-size:1rem; line-height:1; padding:0;
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
+}
+.history-row .h-delete:hover{ background:#B0546A; border-color:#B0546A; color:#fff; }
+.history-row .h-delete:disabled{ opacity:.5; cursor:wait; }
 /* =========================================================
    HISTORY IMAGE VIEWER / ZOOM MODAL
    ========================================================= */
@@ -1621,6 +1631,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
    with a synthetic demo seed shown only until the user has real scans.
 ================================================================= */
 const HISTORY_URL = "../backend-php/api/history.php";
+const DELETE_ANALYSIS_URL = "../backend-php/api/delete_analysis.php";
 const ISSUE_LABELS = ['acne', 'black_spot', 'eyebag', 'redness', 'oiliness', 'wrinkle'];
 let scanHistory = [];
 let usingRealHistory = false; // true once at least one real scan exists — hides the synthetic demo seed
@@ -1828,12 +1839,28 @@ function renderHistoryList() {
             <div class="h-score">
               ${scoreStr}
             </div>
+            ${e.isReal && e.id ? `
+            <button
+              type="button"
+              class="h-delete"
+              data-delete-id="${e.id}"
+              title="ลบผลวิเคราะห์นี้"
+              aria-label="ลบผลวิเคราะห์ ${dateStr}"
+            >🗑</button>` : ''}
           </div>`;
       }).join('')}
     </div>`;
   /* ----------------------------------------------------------
      Click / Touch history row
   ----------------------------------------------------------- */
+  wrap.querySelectorAll('.h-delete').forEach(btn => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation(); // don't open the image viewer
+      deleteHistoryEntry(Number(btn.dataset.deleteId), btn);
+    });
+    btn.addEventListener('keydown', (event) => event.stopPropagation());
+  });
+
   wrap.querySelectorAll('.history-row').forEach(row => {
 
     row.addEventListener('click', () => {
@@ -1860,6 +1887,51 @@ function renderHistoryList() {
     });
 
   });
+}
+
+/** Deletes one of the user's own analyses (row + images) after confirmation,
+ *  then refreshes the history list, chart and compare view. */
+async function deleteHistoryEntry(id, btn) {
+  if (!id) return;
+  if (!confirm('ลบผลวิเคราะห์และรูปภาพนี้ออกจากประวัติ?\nลบแล้วจะกู้คืนไม่ได้')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(DELETE_ANALYSIS_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (res.status === 401) {
+      localStorage.removeItem('skinglow_token');
+      localStorage.removeItem('skinglow_user');
+      window.location.href = LOGIN_PAGE_URL;
+      return;
+    }
+    let json = {};
+    try { json = await res.json(); } catch {}
+    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+
+    scanHistory = scanHistory.filter(e => !(e.isReal && e.id === id));
+    if (!scanHistory.some(e => e.isReal)) {
+      scanHistory = [];
+      usingRealHistory = false;
+      seedScanHistory(); // no real scans left — back to the example data
+    }
+    renderInsightChart();
+    if (tabSections.compare.classList.contains('active-tab')) renderCompareView();
+  } catch (err) {
+    console.error('Delete analysis failed:', err);
+    if (btn) btn.disabled = false;
+    const wrap = document.getElementById('historyListWrap');
+    if (wrap) {
+      const note = document.createElement('p');
+      note.className = 'history-delete-error';
+      note.style.cssText = 'color:#B0546A; font-size:.85rem; margin:8px 0 0;';
+      note.textContent = 'ลบไม่สำเร็จ: ' + (err.message || 'เกิดข้อผิดพลาด') + ' กรุณาลองใหม่';
+      wrap.querySelectorAll('.history-delete-error').forEach(n => n.remove());
+      wrap.prepend(note);
+    }
+  }
 }
 
 function summaryFromCounts(counts) {
