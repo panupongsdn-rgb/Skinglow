@@ -390,6 +390,12 @@
     forgotView.style.display = 'none';
     loginView.style.display = 'block';
   });
+  // arriving from index.html after the user deleted their own account
+  if (new URLSearchParams(location.search).get('deleted') === '1') {
+    const el = document.getElementById('loginNotice');
+    el.textContent = 'ลบบัญชีและข้อมูลทั้งหมดของคุณเรียบร้อยแล้ว';
+    el.style.display = 'block';
+  }
   // arriving from reset_password.html after a successful reset
   if (new URLSearchParams(location.search).get('reset') === 'success') {
     const el = document.getElementById('loginNotice');
