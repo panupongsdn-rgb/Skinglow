@@ -1,29 +1,22 @@
 -- ============================================================
 -- Skinglow - convert all tables to utf8mb4 so Thai text is stored
--- Run once in phpMyAdmin (select the Skinglow database first, then the SQL tab).
 --
--- Why: tables created without a charset take the server default, which on
--- InfinityFree is latin1. Thai characters cannot be stored in latin1, so MySQL
--- saves them as '?'. Names already saved as '????' cannot be recovered by
--- this script - re-enter them after running it.
+-- HOW TO RUN (phpMyAdmin on InfinityFree):
+--   1. In the LEFT panel click your Skinglow database
+--      (the one named like if0_XXXXXXXX_skinglow, NOT information_schema).
+--   2. Open the SQL tab, paste this file, click Go.
+--
+-- Why: tables created without a charset take the server default (latin1).
+-- Thai characters cannot be stored in latin1, so MySQL saved them as '?'.
+-- Names already saved as '????' cannot be recovered - re-enter them after.
+-- (ALTER DATABASE is not used: free hosting accounts are not allowed to run it.)
 -- ============================================================
 
--- 1) check the current charset (latin1_* = the problem)
-SELECT TABLE_NAME, TABLE_COLLATION
-FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = DATABASE();
-
--- 2) make new tables default to utf8mb4
-ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- 3) convert every existing table and its text columns
 ALTER TABLE users            CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE analysis_history CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE products         CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE password_resets  CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE daily_insights   CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- 4) check again (all should now be utf8mb4_unicode_ci)
-SELECT TABLE_NAME, TABLE_COLLATION
-FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = DATABASE();
+-- check: the Collation column should now be utf8mb4_unicode_ci for every table
+SHOW TABLE STATUS;
