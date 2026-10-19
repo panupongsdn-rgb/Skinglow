@@ -66,27 +66,14 @@ def stats(y, s, thr):
             "balanced_accuracy": (rec + spec) / 2, "auc": auc, "threshold": thr}
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--weights", required=True)
-    ap.add_argument("--data-root", required=True)
-    ap.add_argument("--reviews", required=True)
-    ap.add_argument("--split", default="test")
-    ap.add_argument("--conf", type=float, default=0.35, help="app threshold (DETECTION_CONFIDENCE)")
-    ap.add_argument("--imgsz", type=int, default=640)
-    ap.add_argument("--cnn-metrics", default=None, help="metrics_test.json of the zone CNN run")
-    ap.add_argument("--out", default="yolo_vs_cnn")
-    args = ap.parse_args()
-    from ultralytics import YOLO
-    model = YOLO(args.weights)
-    names = {int(k): v for k, v in model.names.items()}
-    revs = {k: v for k, v in load_reviews(args.reviews).items()
-            if v.get("split", args.split) == args.split and v["status"] == "ok"}
-    mesh = fz.make_face_mesh(0.3)
+def collect(model, names, mesh, data_root, reviews, split, imgsz):
+    """YOLO zone scores vs human labels for every reviewed image of one split."""
+    revs = {k: v for k, v in load_reviews(reviews).items()
+            if v.get("split", split) == split and v["status"] == "ok"}
     Y = {c: [] for c in CLASSES}; S = {c: [] for c in CLASSES}
     used = skipped = 0
     for i, (img_name, r) in enumerate(sorted(revs.items())):
-        bgr = cv2.imread(str(Path(args.data_root) / args.split / "images" / img_name))
+        bgr = cv2.imread(str(Path(data_root) / split / "images" / img_name))
         face_zones_in_review = [z for z in r["labels"] if z in FACE]
         if bgr is None or not face_zones_in_review:
             skipped += 1; continue
@@ -94,7 +81,7 @@ def main():
         zones = fz.segment_zones(bgr, landmarks=lm) if lm is not None else None
         if not zones:
             skipped += 1; continue
-        res = model.predict(bgr, conf=0.01, imgsz=args.imgsz, verbose=False)[0]
+        res = model.predict(bgr, conf=0.01, imgsz=imgsz, verbose=False)[0]
         score = {z: {c: 0.0 for c in CLASSES} for z in zones}
         for b, cf, cl in zip(res.boxes.xyxy.cpu().numpy(), res.boxes.conf.cpu().numpy(), res.boxes.cls.cpu().numpy()):
             z = fz.zone_of_box(zones, b); c = names[int(cl)]
@@ -107,18 +94,58 @@ def main():
                 Y[c].append(int(v)); S[c].append(score[z][c])
         used += 1
         if (i + 1) % 100 == 0:
-            print(f"{i + 1}/{len(revs)}")
-    per = {c: stats(Y[c], S[c], args.conf) for c in CLASSES}
+            print(f"{split}: {i + 1}/{len(revs)}")
+    return Y, S, used, skipped
+
+
+def best_threshold(y, s, default):
+    """Threshold in 0.01..0.99 with the highest F1 on (y, s); default if the class has no positives."""
+    if not any(y):
+        return default
+    grid = np.round(np.arange(0.01, 1.0, 0.01), 2)
+    f1s = [stats(y, s, t)["f1"] for t in grid]
+    return float(grid[int(np.argmax(f1s))])
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--weights", required=True)
+    ap.add_argument("--data-root", required=True)
+    ap.add_argument("--reviews", required=True)
+    ap.add_argument("--split", default="test")
+    ap.add_argument("--conf", type=float, default=0.35, help="app threshold (DETECTION_CONFIDENCE)")
+    ap.add_argument("--imgsz", type=int, default=640)
+    ap.add_argument("--tune-split", default=None, help="e.g. valid: choose per-class thresholds there (max F1)")
+    ap.add_argument("--tune-reviews", default=None, help="reviews for --tune-split (default: --reviews)")
+    ap.add_argument("--cnn-metrics", default=None, help="metrics_test.json of the zone CNN run")
+    ap.add_argument("--out", default="yolo_vs_cnn")
+    args = ap.parse_args()
+    from ultralytics import YOLO
+    model = YOLO(args.weights)
+    names = {int(k): v for k, v in model.names.items()}
+    mesh = fz.make_face_mesh(0.3)
+    Y, S, used, skipped = collect(model, names, mesh, args.data_root, args.reviews, args.split, args.imgsz)
+    thr = {c: args.conf for c in CLASSES}
+    if args.tune_split:
+        # fair baseline: pick each class's threshold on validation (max F1), then score test once
+        Yv, Sv, nv, _ = collect(model, names, mesh, args.data_root, args.tune_reviews or args.reviews,
+                                args.tune_split, args.imgsz)
+        thr = {c: best_threshold(Yv[c], Sv[c], args.conf) for c in CLASSES}
+        print(f"thresholds tuned on {args.tune_split} ({nv} images):", {c: round(t, 2) for c, t in thr.items()})
+    per = {c: stats(Y[c], S[c], thr[c]) for c in CLASSES}
     scored = [c for c in CLASSES if per[c]["pos"] and per[c]["n"] - per[c]["pos"]]
     res = {"overall": {"macro_f1": float(np.mean([per[c]["f1"] for c in scored])),
                        "macro_balanced_accuracy": float(np.mean([per[c]["balanced_accuracy"] for c in scored])),
-                       "images": used, "skipped": skipped, "conf": args.conf},
+                       "images": used, "skipped": skipped, "conf": args.conf,
+                       "thresholds": thr, "tuned_on": args.tune_split or None},
            "per_class": per}
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     (out / "metrics_yolo_test.json").write_text(json.dumps(res, indent=2), encoding="utf-8")
     cnn = json.loads(Path(args.cnn_metrics).read_text(encoding="utf-8")) if args.cnn_metrics else None
     L = ["# YOLO เดิม (รายโซน) vs Zone CNN — test ที่คนตรวจแล้ว", "",
-         f"YOLO: {used} ภาพ ({skipped} ข้าม), threshold {args.conf} เท่ากับในแอป", "",
+         (f"YOLO: {used} ภาพ ({skipped} ข้าม), threshold รายคลาสจาก {args.tune_split} (max F1): "
+          + ", ".join(f"{c} {thr[c]:.2f}" for c in CLASSES) if args.tune_split
+          else f"YOLO: {used} ภาพ ({skipped} ข้าม), threshold {args.conf} เท่ากับในแอป"), "",
          "| ปัญหา | ตัวอย่างบวก | F1 YOLO | F1 CNN | Recall YOLO | Recall CNN | Precision YOLO | Precision CNN | AUC YOLO | AUC CNN |",
          "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
     f = lambda v: "–" if v is None or v != v else f"{v * 100:.1f}%"
