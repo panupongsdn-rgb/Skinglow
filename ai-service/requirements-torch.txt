@@ -1,0 +1,8 @@
+# Only needed to run the original .pt files (SKINGLOW_RUNTIME=torch) or to
+# export new .onnx files with export_onnx.py. Not used on Render.
+# Install the CPU torch wheel first:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-torch.txt
+-r requirements.txt
+ultralytics==8.4.118  # must match the version used for training (recorded inside the .pt)
+onnx

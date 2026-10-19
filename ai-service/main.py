@@ -47,6 +47,18 @@ import os
 for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_var, "1")
 
+# glibc malloc keeps one arena per thread and rarely gives freed memory back,
+# which pushed peak RAM to ~460 MB on the 512 MB free instance. Two arenas and
+# an early trim bring the peak down to ~380 MB (measured), at no cost in output.
+# Same as MALLOC_ARENA_MAX=2 MALLOC_TRIM_THRESHOLD_=65536; no-op off glibc.
+try:
+    import ctypes
+    _libc = ctypes.CDLL("libc.so.6")
+    _libc.mallopt(-8, int(os.getenv("MALLOC_ARENA_MAX", "2")))         # M_ARENA_MAX
+    _libc.mallopt(-1, int(os.getenv("MALLOC_TRIM_THRESHOLD_", "65536")))  # M_TRIM_THRESHOLD
+except (OSError, AttributeError):
+    pass
+
 import io
 import threading
 from typing import List, Tuple, Optional
@@ -63,11 +75,8 @@ import ensemble
 import face_zones
 
 cv2.setNumThreads(1)
-try:
-    import torch
-    torch.set_num_threads(1)
-except ImportError:
-    pass
+# torch is only imported when a model has to run from a .pt file (no .onnx);
+# with the .onnx files the service needs no PyTorch at all (~400 MB less RAM).
 
 app = FastAPI(title="Skinglow AI Service", version="5.0.0")
 
@@ -123,9 +132,19 @@ if _available_count > 0:
 # ---------------------------------------------------------------------
 ZONE_MODEL_PATH = os.getenv(
     "ZONE_MODEL_PATH", os.path.join(os.path.dirname(__file__), "models", "zone_classifier.pt"))
+ZONE_ONNX_PATH = os.path.splitext(ZONE_MODEL_PATH)[0] + ".onnx"
 ZONE_PREDICTOR = None
-if os.path.exists(ZONE_MODEL_PATH):
+if ensemble.RUNTIME != "torch" and os.path.exists(ZONE_ONNX_PATH):
     try:
+        from onnx_models import OnnxZonePredictor
+        ZONE_PREDICTOR = OnnxZonePredictor(ZONE_ONNX_PATH)
+        print(f"[startup] zone classifier: {os.path.basename(ZONE_ONNX_PATH)} (onnxruntime)")
+    except Exception as _exc:
+        print(f"[startup] zone classifier onnx not loaded: {_exc!r}")
+if ZONE_PREDICTOR is None and os.path.exists(ZONE_MODEL_PATH):
+    try:
+        import torch
+        torch.set_num_threads(1)
         import zone_model
         ZONE_PREDICTOR = zone_model.load_predictor(ZONE_MODEL_PATH)
     except Exception as _exc:  # torch missing etc. — keep serving without it
@@ -808,8 +827,9 @@ def health_check():
         "model_type": MODEL_TYPE,
         "model_count": _available_count,
         "zone_model_type": ZONE_MODEL_TYPE,
+        "zone_runtime": getattr(ZONE_PREDICTOR, "meta", {}).get("runtime", "torch") if ZONE_PREDICTOR else None,
         "models": [
-            {"file": cfg["file"], "loaded": m.available, "error": m.load_error}
+            {"file": os.path.basename(m.path), "runtime": m.runtime, "loaded": m.available, "error": m.load_error}
             for cfg, m in zip(ensemble.ENSEMBLE_CONFIG, ENSEMBLE_MEMBERS)
         ],
     }

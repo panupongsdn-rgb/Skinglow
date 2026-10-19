@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/BoundingBoxDrawer.php';
+require_once __DIR__ . '/../src/ZoneDetections.php';
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/ImageOrientation.php';
 
@@ -93,22 +94,37 @@ ImageOrientation::normalize($originalPath, $actualMime);
 // ---------------------------------------------------------------
 // 3. Forward image to the Python AI service via cURL
 // ---------------------------------------------------------------
-$ch = curl_init(AI_SERVICE_URL);
-curl_setopt_array($ch, [
-    CURLOPT_POST           => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 30,
-    CURLOPT_POSTFIELDS     => [
-        'file'     => new CURLFile($originalPath, $actualMime, $uniqueName),
-        // front-camera captures are mirrored; the AI needs it to name left/right cheeks correctly
-        'mirrored' => (($_POST['mirrored'] ?? '0') === '1') ? 'true' : 'false',
-    ],
-]);
+function callAiService(string $url, string $path, string $mime, string $name, int $connectTimeout): array
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        // Render free tier sleeps after 15 min; waking up + loading the models can take ~50 s.
+        // InfinityFree stops PHP at 60 s, so wait up to 55 s.
+        CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+        CURLOPT_TIMEOUT        => 55,
+        CURLOPT_POSTFIELDS     => [
+            'file'     => new CURLFile($path, $mime, $name),
+            // front-camera captures are mirrored; the AI needs it to name left/right cheeks correctly
+            'mirrored' => (($_POST['mirrored'] ?? '0') === '1') ? 'true' : 'false',
+        ],
+    ]);
+    $raw = curl_exec($ch);
+    $result = [$raw, curl_error($ch), (int) curl_getinfo($ch, CURLINFO_HTTP_CODE), curl_errno($ch)];
+    curl_close($ch);
+    return $result;
+}
 
-$aiResponseRaw = curl_exec($ch);
-$curlError = curl_error($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
+[$aiResponseRaw, $curlError, $httpCode, $curlErrno] =
+    callAiService(AI_SERVICE_URL, $originalPath, $actualMime, $uniqueName, AI_SERVICE_FALLBACK_URL ? 3 : 20);
+
+// Local AI service (localhost) not running -> fall back to the Render service
+if ($aiResponseRaw === false && AI_SERVICE_FALLBACK_URL
+    && $curlErrno === CURLE_COULDNT_CONNECT) {
+    [$aiResponseRaw, $curlError, $httpCode, $curlErrno] =
+        callAiService(AI_SERVICE_FALLBACK_URL, $originalPath, $actualMime, $uniqueName, 20);
+}
 
 if ($aiResponseRaw === false || $httpCode !== 200) {
     respond(502, [
@@ -125,6 +141,11 @@ if (!is_array($aiResult) || !isset($aiResult['detections'])) {
 
 $detections = $aiResult['detections'];   // e.g. [{box, label, confidence}, ...]
 $zones      = $aiResult['zones'] ?? [];  // [{zone, name_th, score, issues:[{label, label_th, probability}], polygons, box}, ...]
+// With the per-zone classifier, the boxes follow its results: YOLO boxes that
+// disagree with their zone are dropped, zone problems without a box get one.
+if (($aiResult['zone_model_type'] ?? '') === 'zone_classifier' && $zones) {
+    $detections = ZoneDetections::reconcile($detections, $zones);
+}
 $skinScore  = $aiResult['skin_score'] ?? null;
 $skinStatus = $aiResult['skin_status'] ?? 'issues_found'; // 'clear' | 'issues_found' | 'no_face_detected'
 $faceDetected = $aiResult['face_detected'] ?? true;

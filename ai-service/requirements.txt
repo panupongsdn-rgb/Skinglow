@@ -5,22 +5,13 @@ pillow==10.3.0
 pydantic==2.7.1
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
-
-# --- Trained model inference ---
-# ultralytics pulls in torch as a dependency. The default PyPI torch wheel
-# includes CUDA support and is huge (700MB+), which risks blowing past
-# free-tier build size/time limits (e.g. Render free web service). Install
-# the CPU-only torch wheel FIRST from PyTorch's own index, then ultralytics,
-# so pip doesn't re-resolve the large CUDA build:
-#
-#   pip install torch --index-url https://download.pytorch.org/whl/cpu
-#   pip install ultralytics==8.4.118
-#
-# If your host's build step only reads this file directly (`pip install -r
-# requirements.txt`), keep the two-step install above in your build command
-# instead of relying on this file alone — see render.yaml in this repo.
-ultralytics==8.4.118  # must match the version used for training (recorded inside the .pt)
-# torchvision (installed with torch above, from the CPU index) is also used by
-# zone_model.py for the per-zone classifier in models/zone_classifier.pt
-ensemble-boxes==1.0.9
 mediapipe==0.10.21
+
+# --- Trained model inference: ONNX Runtime, no PyTorch ---
+# models/skin_analysis_farmasi.onnx (YOLOv8) and models/zone_classifier.onnx
+# run on onnxruntime (~15 MB of RAM) instead of torch + ultralytics (~400 MB),
+# so the service fits Render's free 512 MB instance. Results are identical
+# (checked image by image). After retraining, re-create the .onnx files with
+# export_onnx.py on the training machine (that step needs torch + ultralytics:
+# see requirements-torch.txt). Weighted Boxes Fusion is vendored in wbf.py.
+onnxruntime>=1.19,<2

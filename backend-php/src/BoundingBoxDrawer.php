@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 /**
  * Draws the analysed face zones (thin outlines) and the detection bounding
- * boxes + labels on a face image using the GD library.
+ * boxes + labels on a face image using the GD library. Detections with
+ * "source" => "zone" are whole-zone boxes added by ZoneDetections (thinner line).
  * Input format for detections (as returned by the AI service):
  * [
  *   ["box" => [x_min, y_min, x_max, y_max], "label" => "acne", "confidence" => 0.85],
@@ -47,6 +48,11 @@ final class BoundingBoxDrawer
 
         self::drawZones($image, $zones);
 
+        $labelSlots = []; // box key => number of labels already drawn on that box
+        $placed = [];     // label rectangles already drawn [x1, y1, x2, y2]
+        $font = imagesx($image) >= 900 ? 5 : 4;
+        $lineH = imagefontheight($font) + 4;
+
         foreach ($detections as $detection) {
             $box   = $detection['box'] ?? null;
             $label = $detection['label'] ?? 'default';
@@ -60,18 +66,38 @@ final class BoundingBoxDrawer
             [$r, $g, $b] = self::$colorMap[$label] ?? self::$colorMap['default'];
             $color = imagecolorallocate($image, $r, $g, $b);
 
-            // Draw rectangle (thickness 3px by drawing multiple offsets)
-            for ($t = 0; $t < 3; $t++) {
-                imagerectangle($image, $xMin - $t, $yMin - $t, $xMax + $t, $yMax + $t, $color);
+            [$xMin, $yMin, $xMax, $yMax] = array_map('intval', [$xMin, $yMin, $xMax, $yMax]);
+            $key = "$xMin,$yMin,$xMax,$yMax";
+            $slot = $labelSlots[$key] ?? 0;
+            $labelSlots[$key] = $slot + 1;
+
+            // Rectangle: 3px for exact detector boxes, 2px for whole-zone boxes;
+            // drawn once per box even when several problems share it
+            if ($slot === 0) {
+                $thick = (($detection['source'] ?? '') === 'zone') ? 2 : 3;
+                for ($t = 0; $t < $thick; $t++) {
+                    imagerectangle($image, $xMin - $t, $yMin - $t, $xMax + $t, $yMax + $t, $color);
+                }
             }
 
-            // Label background + text
+            // Label: above the box (inside it when there is no room), stacked
+            // downwards when one box carries several problems
             $text = $conf !== null ? sprintf('%s %.0f%%', $label, $conf * 100) : $label;
-            $textBoxWidth = imagefontwidth(4) * strlen($text) + 8;
-            imagefilledrectangle($image, $xMin, max(0, $yMin - 18), $xMin + $textBoxWidth, $yMin, $color);
-
+            $textBoxWidth = imagefontwidth($font) * strlen($text) + 8;
+            $top = ($yMin - $lineH >= 0) ? $yMin - $lineH + $slot * $lineH : $yMin + $slot * $lineH;
+            if ($slot > 0 && $yMin - $lineH >= 0) {
+                $top = $yMin + ($slot - 1) * $lineH; // first label sits above, the rest inside
+            }
+            // Keep the label inside the image and off labels already drawn
+            $left = max(0, min($xMin, imagesx($image) - $textBoxWidth - 1));
+            for ($try = 0; $try < 8 && self::overlaps($placed, $left, $top, $textBoxWidth, $lineH); $try++) {
+                $top += $lineH;
+            }
+            $top = max(0, min($top, imagesy($image) - $lineH - 1));
+            $placed[] = [$left, $top, $left + $textBoxWidth, $top + $lineH];
+            imagefilledrectangle($image, $left, $top, $left + $textBoxWidth, $top + $lineH, $color);
             $white = imagecolorallocate($image, 255, 255, 255);
-            imagestring($image, 4, $xMin + 4, max(0, $yMin - 18), $text, $white);
+            imagestring($image, $font, $left + 4, $top + 2, $text, $white);
         }
 
         $saved = match ($mime) {
@@ -84,6 +110,17 @@ final class BoundingBoxDrawer
         imagedestroy($image);
 
         return (bool) $saved;
+    }
+
+    /** @param array<int,array{int,int,int,int}> $placed */
+    private static function overlaps(array $placed, int $x, int $y, int $w, int $h): bool
+    {
+        foreach ($placed as [$x1, $y1, $x2, $y2]) {
+            if ($x < $x2 && $x + $w > $x1 && $y < $y2 && $y + $h > $y1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Zone outlines: lavender, 2px, drawn under the detection boxes. */

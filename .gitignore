@@ -1,0 +1,12 @@
+# secrets — never commit
+backend-php/config/secrets.local.php
+
+# user uploads
+backend-php/uploads/original/*
+backend-php/uploads/processed/*
+
+# python
+__pycache__/
+*.pyc
+ai-service/venv/
+.venv/

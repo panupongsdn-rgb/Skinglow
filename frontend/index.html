@@ -142,6 +142,27 @@
     position:absolute; bottom:5%; left:50%; transform:translateX(-50%);
     z-index:4;
   }
+  /* retake: shown on the photo once one has been picked, so the user can try
+     again without reloading the page */
+  .retake-bar{
+    position:absolute; bottom:5%; left:50%; transform:translateX(-50%);
+    z-index:4; gap:8px; flex-wrap:nowrap;
+  }
+  .retake-bar .btn, .cancel-camera-btn{width:auto; min-height:0; padding:9px 16px; font-size:.82rem; white-space:nowrap;}
+  .retake-bar .btn.ghost, .cancel-camera-btn{background:rgba(255,255,255,.92);}
+  .retake-bar .btn.ghost:hover, .cancel-camera-btn:hover{background:var(--sage-deep); color:#fff;}
+  .cancel-camera-btn{position:absolute; top:5%; right:5%; z-index:4;}
+  .scanning .retake-bar, .scanning .cancel-camera-btn{display:none !important;}
+  .result-actions{display:flex; gap:10px; flex-wrap:wrap; margin:-4px 0 6px;}
+  /* the mobile rule ".btn{width:100%}" further down must not stretch the
+     buttons that float over the camera / photo: keep them compact pills */
+  .scan-panel .cancel-camera-btn{
+    width:auto; min-height:0; top:12px; right:12px; left:auto;
+    padding:7px 14px; font-size:.8rem; line-height:1.2;
+  }
+  .scan-panel .capture-btn{width:auto; min-width:150px; white-space:nowrap; padding:11px 24px;}
+  .scan-panel .retake-bar .btn{width:auto; min-height:0;}
+  .result-actions .btn{width:auto;}
   .btn{
     display:inline-flex; align-items:center; gap:8px;
     background:linear-gradient(120deg, var(--sage), var(--blush-deep)); color:#fff; border:none; border-radius:999px;
@@ -273,6 +294,16 @@
   .history-row .h-score{
     font-family:'Fraunces',serif; font-size:1.15rem; color:var(--sage-deep); flex-shrink:0; min-width:44px; text-align:right;
   }
+/* delete button on each history row (own, real scans only) */
+.history-row .h-delete{
+  flex-shrink:0; width:34px; height:34px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent; border:1px solid var(--line); color:#B0546A;
+  cursor:pointer; font-size:1rem; line-height:1; padding:0;
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
+}
+.history-row .h-delete:hover{ background:#B0546A; border-color:#B0546A; color:#fff; }
+.history-row .h-delete:disabled{ opacity:.5; cursor:wait; }
 /* =========================================================
    HISTORY IMAGE VIEWER / ZOOM MODAL
    ========================================================= */
@@ -453,8 +484,22 @@
   line-height:1.5;
   padding-right:45px;
 }
+/* per-zone details in the history popup */
+.history-modal-zones{margin-top:14px;}
+.history-modal-zones-title{font-size:.92rem; color:var(--sage-deep); margin:0 0 10px;}
+.history-modal-zones .zone-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+.history-modal-content.has-zones{width:min(96vw, 1180px);}
+@media (min-width:861px){
+  .history-modal-content.has-zones{flex-direction:row; height:min(88vh, 760px);}
+  .history-modal-content.has-zones .history-modal-image-wrap{flex:1 1 auto; height:auto; min-width:0;}
+  .history-modal-content.has-zones .history-modal-info{
+    flex:0 0 380px; overflow-y:auto; border-top:none; border-left:1px solid var(--line); padding-top:56px;
+  }
+}
 /* ---------- Mobile ---------- */
 @media (max-width:860px){
+  .history-modal-content.has-zones{overflow-y:auto;}
+  .history-modal-content.has-zones .history-modal-image-wrap{height:46vh; flex:0 0 auto;}
   .history-image-modal{
     padding:10px;
   }
@@ -498,6 +543,17 @@
 
   /* ---- Compare view ---- */
   .compare-grid{display:grid; grid-template-columns:1fr auto 1fr; gap:24px; align-items:start;}
+  .compare-picker{display:flex; flex-wrap:wrap; gap:12px 16px; align-items:flex-end; margin:0 0 20px;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
+  .compare-picker .cp-field{display:flex; flex-direction:column; gap:6px; flex:1 1 220px; min-width:0;}
+  .compare-picker label{font-size:.78rem; font-weight:600; color:var(--ink-soft);}
+  .compare-picker select{font:inherit; font-size:.88rem; padding:9px 10px; border-radius:10px;
+    border:1px solid var(--line); background:#fff; color:var(--ink); width:100%;}
+  .compare-picker .cp-quick{display:flex; flex-wrap:wrap; gap:8px; flex:1 1 100%;}
+  .chip-btn{font:inherit; font-size:.78rem; padding:6px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:#fff; color:var(--sage-deep);}
+  .chip-btn:hover{background:var(--sage-deep); color:#fff; border-color:var(--sage-deep);}
+  .cp-gap{font-size:.75rem; color:var(--ink-soft); text-align:center; margin:4px 0 8px;}
   .compare-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
   .compare-card .cc-image{width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--ivory);}
   .compare-card .cc-body{padding:18px 20px;}
@@ -916,6 +972,83 @@ main{
 }
 
 
+
+/* =========================================================
+   PROFILE (name / skin type / password / delete account)
+   ========================================================= */
+.user-name-btn{
+  background:none; border:1px solid transparent; border-radius:999px; padding:6px 12px;
+  font:inherit; font-size:.85rem; font-weight:600; color:var(--ink-soft); cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+  transition:background .15s ease, border-color .15s ease;
+}
+.user-name-btn:hover{ background:var(--ivory, #FBF8FD); border-color:var(--line); }
+.profile-modal{
+  position:fixed; inset:0; z-index:2000; display:none;
+  align-items:flex-start; justify-content:center; overflow-y:auto;
+  background:rgba(36,26,51,.45); padding:40px 16px;
+}
+.profile-modal.open{ display:flex; }
+.profile-card{
+  width:100%; max-width:520px; background:var(--panel); border-radius:var(--radius);
+  box-shadow:0 24px 60px -24px rgba(36,26,51,.45); padding:24px; position:relative;
+}
+.profile-card h2{ font-size:1.25rem; color:var(--ink); margin:0 0 4px; }
+.profile-card .profile-sub{ font-size:.82rem; color:var(--ink-soft); margin:0 0 18px; }
+.profile-close{
+  position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%;
+  border:1px solid var(--line); background:var(--panel); cursor:pointer; font-size:1.1rem; color:var(--ink-soft);
+}
+.profile-section{ border-top:1px solid var(--line); padding:18px 0 4px; }
+.profile-section h3{ font-size:.95rem; color:var(--ink); margin:0 0 12px; }
+.profile-field{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+.profile-field label{ font-size:.8rem; font-weight:600; color:var(--ink-soft); }
+.profile-field input, .profile-field select{
+  font:inherit; font-size:.92rem; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--line); background:#fff; color:var(--ink); width:100%; box-sizing:border-box;
+}
+.profile-field input[readonly]{ background:#F6F2FA; color:var(--ink-soft); }
+.profile-field .hint{ font-size:.75rem; color:var(--ink-soft); }
+.profile-msg{ font-size:.82rem; margin:4px 0 10px; display:none; }
+.profile-msg.ok{ display:block; color:#2E9B6E; }
+.profile-msg.err{ display:block; color:#B0546A; }
+.profile-card .btn{ width:auto; }
+.profile-danger{ border-top:1px solid #F3C7D2; }
+.profile-danger h3{ color:#B0546A; }
+.btn.danger{ background:#B0546A; border-color:#B0546A; color:#fff; }
+.btn.danger:hover{ background:#8F3F53; border-color:#8F3F53; }
+.btn:disabled{ opacity:.6; cursor:wait; }
+
+/* =========================================================
+   CAMERA GUIDE (face outline + light check)
+   ========================================================= */
+.camera-guide{
+  position:absolute; inset:0; z-index:4; pointer-events:none; display:none;
+  align-items:center; justify-content:center;
+}
+.camera-guide.show{ display:flex; }
+.camera-guide .face-oval{
+  width:42%; height:56%; border-radius:50%;
+  border:2.5px dashed rgba(255,255,255,.9);
+  box-shadow:0 0 0 2px rgba(59,42,84,.25);
+  transform:translateY(-4%);
+}
+.camera-guide .light-chip{
+  position:absolute; top:14px; left:50%; transform:translateX(-50%);
+  font-size:.78rem; font-weight:600; padding:6px 12px; border-radius:999px;
+  background:rgba(36,26,51,.72); color:#fff; white-space:nowrap;
+}
+.camera-guide .light-chip.ok{ background:rgba(46,155,110,.88); }
+.camera-guide .light-chip.warn{ background:rgba(214,120,40,.92); }
+.camera-guide .guide-tip{
+  position:absolute; bottom:72px; left:50%; transform:translateX(-50%);
+  font-size:.75rem; color:#fff; background:rgba(36,26,51,.6);
+  padding:4px 10px; border-radius:999px; white-space:nowrap;
+}
+@media (max-width:860px){
+  .camera-guide .guide-tip{ bottom:84px; font-size:.7rem; }
+  .user-name-btn{ justify-content:flex-start; padding:10px 0; }
+}
 </style>
 </head>
 <body>
@@ -939,7 +1072,10 @@ main{
     </nav>
     <div class="user-menu">
       <a href="admin.html" id="adminLink" class="admin-link" style="display:none;">Admin Panel</a>
-      <span class="user-name" id="userNameLabel"></span>
+      <button type="button" class="user-name-btn" id="profileBtn" title="โปรไฟล์ของฉัน">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6" stroke-linecap="round"/></svg>
+        <span class="user-name" id="userNameLabel"></span>
+      </button>
       <button type="button" class="logout-btn" id="logoutBtn" title="ออกจากระบบ">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -969,6 +1105,11 @@ main{
 
       <img id="preview-img" alt="ภาพตัวอย่างใบหน้า">
       <video id="camera-video" autoplay playsinline muted></video>
+      <div class="camera-guide" id="cameraGuide" aria-hidden="true">
+        <div class="face-oval"></div>
+        <div class="light-chip" id="lightChip">กำลังตรวจแสง…</div>
+        <div class="guide-tip">จัดใบหน้าให้อยู่ในกรอบ มองตรง</div>
+      </div>
 
       <div class="drop-zone" id="dropZone">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6B4E96" stroke-width="1.5"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round"/></svg>
@@ -984,12 +1125,25 @@ main{
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="4"/><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" stroke-linejoin="round"/></svg>
         ถ่ายภาพ
       </button>
+      <button class="btn ghost cancel-camera-btn" id="cancelCameraBtn" type="button" style="display:none;">ยกเลิก</button>
+
+      <div class="retake-bar" id="retakeBar" style="display:none;">
+        <button class="btn" id="retakeCameraBtn" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          ถ่ายใหม่
+        </button>
+        <button class="btn ghost" id="retakeUploadBtn" type="button">เลือกรูปอื่น</button>
+      </div>
     </div>
   </section>
 
   <section id="results">
     <h2 class="section-title">ผลการวิเคราะห์ผิว</h2>
     <p class="section-sub" id="resultSummary">—</p>
+    <div class="result-actions">
+      <button class="btn" id="resultRetakeBtn" type="button">ถ่ายภาพใหม่</button>
+      <button class="btn ghost" id="resultUploadBtn" type="button">เลือกรูปอื่น</button>
+    </div>
 
     <div class="results-grid">
       <div>
@@ -1059,11 +1213,75 @@ main{
 <div id="compareTab" class="tab-section">
   <div class="panel-head">
     <h2>Compare My Skin</h2>
-    <p>เปรียบเทียบผลวิเคราะห์ผิวล่าสุดของคุณกับครั้งก่อนหน้า เพื่อดูว่าดีขึ้นหรือแย่ลง</p>
+    <p>เลือกผลวิเคราะห์ 2 ครั้งใดก็ได้มาเปรียบเทียบ เพื่อดูว่าผิวดีขึ้นหรือแย่ลง (ค่าเริ่มต้นคือครั้งล่าสุดกับครั้งก่อนหน้า)</p>
   </div>
   <div id="compareContent"></div>
 </div>
 </main>
+
+<!-- ============ PROFILE MODAL ============ -->
+<div class="profile-modal" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+  <div class="profile-card">
+    <button type="button" class="profile-close" id="profileCloseBtn" aria-label="ปิด">×</button>
+    <h2 id="profileTitle">โปรไฟล์ของฉัน</h2>
+    <p class="profile-sub" id="profileSince">—</p>
+
+    <form class="profile-section" id="profileForm" novalidate>
+      <h3>ข้อมูลส่วนตัว</h3>
+      <div class="profile-field">
+        <label for="profileName">ชื่อ-นามสกุล</label>
+        <input type="text" id="profileName" maxlength="150" required>
+      </div>
+      <div class="profile-field">
+        <label for="profileEmail">อีเมล</label>
+        <input type="email" id="profileEmail" readonly>
+        <span class="hint">อีเมลใช้เข้าสู่ระบบ เปลี่ยนไม่ได้</span>
+      </div>
+      <div class="profile-field">
+        <label for="profileSkin">ประเภทผิว</label>
+        <select id="profileSkin">
+          <option value="">ไม่ระบุ</option>
+          <option value="normal">ผิวธรรมดา (normal)</option>
+          <option value="oily">ผิวมัน (oily)</option>
+          <option value="dry">ผิวแห้ง (dry)</option>
+          <option value="combination">ผิวผสม (combination)</option>
+          <option value="sensitive">ผิวแพ้ง่าย (sensitive)</option>
+        </select>
+      </div>
+      <p class="profile-msg" id="profileMsg"></p>
+      <button type="submit" class="btn" id="profileSaveBtn">บันทึกข้อมูล</button>
+    </form>
+
+    <form class="profile-section" id="passwordForm" novalidate>
+      <h3>เปลี่ยนรหัสผ่าน</h3>
+      <div class="profile-field">
+        <label for="pwCurrent">รหัสผ่านปัจจุบัน</label>
+        <input type="password" id="pwCurrent" autocomplete="current-password">
+      </div>
+      <div class="profile-field">
+        <label for="pwNew">รหัสผ่านใหม่</label>
+        <input type="password" id="pwNew" autocomplete="new-password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร">
+      </div>
+      <div class="profile-field">
+        <label for="pwConfirm">ยืนยันรหัสผ่านใหม่</label>
+        <input type="password" id="pwConfirm" autocomplete="new-password">
+      </div>
+      <p class="profile-msg" id="passwordMsg"></p>
+      <button type="submit" class="btn" id="passwordSaveBtn">เปลี่ยนรหัสผ่าน</button>
+    </form>
+
+    <form class="profile-section profile-danger" id="deleteAccountForm" novalidate>
+      <h3>ลบบัญชี</h3>
+      <p class="profile-sub" style="margin-bottom:12px;">ลบบัญชี ผลวิเคราะห์ และรูปภาพทั้งหมดของคุณอย่างถาวร กู้คืนไม่ได้</p>
+      <div class="profile-field">
+        <label for="deletePassword">ยืนยันด้วยรหัสผ่าน</label>
+        <input type="password" id="deletePassword" autocomplete="current-password">
+      </div>
+      <p class="profile-msg" id="deleteMsg"></p>
+      <button type="submit" class="btn danger" id="deleteAccountBtn">ลบบัญชีของฉัน</button>
+    </form>
+  </div>
+</div>
 <!-- =========================================================
      HISTORY IMAGE VIEWER
      ========================================================= -->
@@ -1138,6 +1356,11 @@ main{
         class="history-modal-summary"
         id="historyModalSummary"
       ></div>
+      <div class="history-modal-zones" id="historyModalZones" hidden>
+        <h4 class="history-modal-zones-title">ผลวิเคราะห์แยกตามส่วนของใบหน้า</h4>
+        <div class="zone-grid" id="historyModalZoneGrid"></div>
+        <p class="zone-note">ตัวเลขมุมขวาคือคะแนนของโซน (100 = ไม่พบปัญหา) · % คือความมั่นใจของโมเดล</p>
+      </div>
     </div>
   </div>
 </div>
@@ -1200,6 +1423,8 @@ const cameraVideo = document.getElementById('camera-video');
 const uploadBtn   = document.getElementById('uploadBtn');
 const cameraBtn   = document.getElementById('cameraBtn');
 const captureBtn  = document.getElementById('captureBtn');
+const cancelCameraBtn = document.getElementById('cancelCameraBtn');
+const retakeBar       = document.getElementById('retakeBar');
 
 const resultsSection = document.getElementById('results');
 const resultImage    = document.getElementById('resultImage');
@@ -1219,6 +1444,7 @@ dropZone.addEventListener('click', (e) => { if (e.target === dropZone) fileInput
 
 fileInput.addEventListener('change', () => {
   if (fileInput.files[0]) handleImageFile(fileInput.files[0]);
+  fileInput.value = '';  // so choosing the same file again still triggers 'change'
 });
 
 ['dragover','dragleave','drop'].forEach(evt => {
@@ -1248,18 +1474,62 @@ captureBtn.addEventListener('click', capturePhoto);
 const MIRROR_FRONT_CAMERA = true;
 
 async function openCamera() {
+  if (scanPanel.classList.contains('scanning')) return;
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    if (!cameraStream || !cameraStream.active) {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    }
     cameraVideo.srcObject = cameraStream;
     cameraVideo.classList.toggle('mirrored', MIRROR_FRONT_CAMERA);
     cameraVideo.style.display = 'block';
     previewImg.style.display = 'none';
     dropZone.style.display = 'none';
+    retakeBar.style.display = 'none';
     captureBtn.style.display = 'inline-flex';
+    cancelCameraBtn.style.display = 'inline-flex';
+    startCameraGuide();
   } catch (err) {
     alert('ไม่สามารถเข้าถึงกล้องได้: ' + err.message);
   }
 }
+
+/* ------------------------------------------------------------
+   Retake — try again with a new photo without reloading the page.
+   The old result is replaced as soon as the new photo is analysed.
+------------------------------------------------------------- */
+let hasPhoto = false;  // a photo is in the panel (being analysed or analysed)
+
+function showIdleOrPhoto() {
+  // back to whatever the panel showed before the camera was opened
+  if (hasPhoto) {
+    previewImg.style.display = 'block';
+    retakeBar.style.display = 'flex';
+  } else {
+    dropZone.style.display = 'block';
+  }
+}
+
+function cancelCamera() {
+  stopCamera();
+  showIdleOrPhoto();
+}
+
+function pickAnotherFile() {
+  if (scanPanel.classList.contains('scanning')) return;
+  fileInput.value = '';
+  fileInput.click();
+}
+
+function retakeFromResults(useCamera) {
+  scanPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (useCamera) openCamera(); else pickAnotherFile();
+}
+
+cancelCameraBtn.addEventListener('click', cancelCamera);
+document.getElementById('retakeCameraBtn').addEventListener('click', openCamera);
+document.getElementById('retakeUploadBtn').addEventListener('click', pickAnotherFile);
+document.getElementById('resultRetakeBtn').addEventListener('click', () => retakeFromResults(true));
+document.getElementById('resultUploadBtn').addEventListener('click', () => retakeFromResults(false));
 
 function capturePhoto() {
   if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) {
@@ -1290,9 +1560,183 @@ function capturePhoto() {
 
 function stopCamera() {
   if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+  cameraStream = null;
   cameraVideo.style.display = 'none';
   captureBtn.style.display = 'none';
+  cancelCameraBtn.style.display = 'none';
+  stopCameraGuide();
 }
+
+/* ================================================================
+   PROFILE — edit name / skin type, change password, delete account
+================================================================= */
+const PROFILE_URL = "../backend-php/api/profile.php";
+const CHANGE_PASSWORD_URL = "../backend-php/api/change_password.php";
+const DELETE_ACCOUNT_URL = "../backend-php/api/delete_account.php";
+
+async function profileApi(url, body) {
+  const res = await fetch(url, {
+    method: body ? 'POST' : 'GET',
+    headers: Object.assign({ 'Authorization': 'Bearer ' + AUTH_TOKEN },
+                           body ? { 'Content-Type': 'application/json' } : {}),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401) {
+    localStorage.removeItem('skinglow_token');
+    localStorage.removeItem('skinglow_user');
+    window.location.href = LOGIN_PAGE_URL;
+    throw new Error('กรุณาเข้าสู่ระบบใหม่');
+  }
+  let json = {};
+  try { json = await res.json(); } catch {}
+  if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+  return json;
+}
+
+function setProfileMsg(id, text, ok) {
+  const el = document.getElementById(id);
+  el.textContent = text || '';
+  el.className = 'profile-msg' + (text ? (ok ? ' ok' : ' err') : '');
+}
+
+const profileModal = document.getElementById('profileModal');
+
+async function openProfile() {
+  ['profileMsg', 'passwordMsg', 'deleteMsg'].forEach(id => setProfileMsg(id, ''));
+  document.getElementById('passwordForm').reset();
+  document.getElementById('deleteAccountForm').reset();
+  document.getElementById('profileName').value = CURRENT_USER.full_name || '';
+  document.getElementById('profileEmail').value = CURRENT_USER.email || '';
+  profileModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  const navToggle = document.getElementById('navToggle');
+  if (navToggle && navToggle.getAttribute('aria-expanded') === 'true') navToggle.click(); // close mobile menu
+  try {
+    const { data } = await profileApi(PROFILE_URL);
+    document.getElementById('profileName').value = data.full_name || '';
+    document.getElementById('profileEmail').value = data.email || '';
+    document.getElementById('profileSkin').value = data.skin_type || '';
+    const since = data.created_at ? new Date(data.created_at.replace(' ', 'T')) : null;
+    document.getElementById('profileSince').textContent =
+      since && !isNaN(since) ? 'สมาชิกตั้งแต่ ' + since.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    document.getElementById('deleteAccountForm').style.display = data.role === 'admin' ? 'none' : '';
+  } catch (err) {
+    setProfileMsg('profileMsg', 'โหลดข้อมูลไม่สำเร็จ: ' + err.message, false);
+  }
+}
+
+function closeProfile() {
+  profileModal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('profileBtn').addEventListener('click', openProfile);
+document.getElementById('profileCloseBtn').addEventListener('click', closeProfile);
+profileModal.addEventListener('click', (e) => { if (e.target === profileModal) closeProfile(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && profileModal.classList.contains('open')) closeProfile(); });
+
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('profileName').value.trim();
+  if (!name) return setProfileMsg('profileMsg', 'กรุณากรอกชื่อ-นามสกุล', false);
+  const btn = document.getElementById('profileSaveBtn');
+  btn.disabled = true;
+  try {
+    const { data, message } = await profileApi(PROFILE_URL, {
+      full_name: name, skin_type: document.getElementById('profileSkin').value,
+    });
+    CURRENT_USER.full_name = data.full_name;
+    localStorage.setItem('skinglow_user', JSON.stringify(CURRENT_USER));
+    document.getElementById('userNameLabel').textContent = data.full_name;
+    setProfileMsg('profileMsg', message, true);
+  } catch (err) {
+    setProfileMsg('profileMsg', err.message, false);
+  } finally { btn.disabled = false; }
+});
+
+document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const current = document.getElementById('pwCurrent').value;
+  const next = document.getElementById('pwNew').value;
+  const confirmPw = document.getElementById('pwConfirm').value;
+  if (!current) return setProfileMsg('passwordMsg', 'กรุณากรอกรหัสผ่านปัจจุบัน', false);
+  if (next.length < 8) return setProfileMsg('passwordMsg', 'รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร', false);
+  if (next !== confirmPw) return setProfileMsg('passwordMsg', 'ยืนยันรหัสผ่านใหม่ไม่ตรงกัน', false);
+  const btn = document.getElementById('passwordSaveBtn');
+  btn.disabled = true;
+  try {
+    const { message } = await profileApi(CHANGE_PASSWORD_URL, { current_password: current, new_password: next });
+    document.getElementById('passwordForm').reset();
+    setProfileMsg('passwordMsg', message, true);
+  } catch (err) {
+    setProfileMsg('passwordMsg', err.message, false);
+  } finally { btn.disabled = false; }
+});
+
+document.getElementById('deleteAccountForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw = document.getElementById('deletePassword').value;
+  if (!pw) return setProfileMsg('deleteMsg', 'กรุณากรอกรหัสผ่านเพื่อยืนยัน', false);
+  if (!confirm('ยืนยันลบบัญชี?\nผลวิเคราะห์และรูปภาพทั้งหมดจะถูกลบถาวร และกู้คืนไม่ได้')) return;
+  const btn = document.getElementById('deleteAccountBtn');
+  btn.disabled = true;
+  try {
+    await profileApi(DELETE_ACCOUNT_URL, { password: pw });
+    localStorage.removeItem('skinglow_token');
+    localStorage.removeItem('skinglow_user');
+    window.location.href = LOGIN_PAGE_URL + (LOGIN_PAGE_URL.includes('?') ? '&' : '?') + 'deleted=1';
+  } catch (err) {
+    setProfileMsg('deleteMsg', err.message, false);
+    btn.disabled = false;
+  }
+});
+
+/* ================================================================
+   CAMERA GUIDE — face outline + live light check while the camera is open
+================================================================= */
+const cameraGuide = document.getElementById('cameraGuide');
+const lightChip = document.getElementById('lightChip');
+const lightCanvas = document.createElement('canvas');
+lightCanvas.width = 48; lightCanvas.height = 48;
+let lightTimer = null;
+
+function checkLight() {
+  if (!cameraVideo.videoWidth) return;
+  const ctx = lightCanvas.getContext('2d', { willReadFrequently: true });
+  // centre of the frame, where the face should be
+  const vw = cameraVideo.videoWidth, vh = cameraVideo.videoHeight;
+  const sw = vw * 0.5, sh = vh * 0.6;
+  ctx.drawImage(cameraVideo, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, 48, 48);
+  const px = ctx.getImageData(0, 0, 48, 48).data;
+  let sum = 0;
+  for (let i = 0; i < px.length; i += 4) sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+  const lum = sum / (px.length / 4); // 0 (black) – 255 (white)
+  if (lum < 70) {
+    lightChip.textContent = 'แสงน้อยเกินไป ลองหันหน้าเข้าหาแสง';
+    lightChip.className = 'light-chip warn';
+  } else if (lum > 200) {
+    lightChip.textContent = 'แสงจ้าเกินไป ลองหลบแสงที่ส่องตรง';
+    lightChip.className = 'light-chip warn';
+  } else {
+    lightChip.textContent = 'แสงพอดี ✓';
+    lightChip.className = 'light-chip ok';
+  }
+}
+
+function startCameraGuide() {
+  lightChip.textContent = 'กำลังตรวจแสง…';
+  lightChip.className = 'light-chip';
+  cameraGuide.classList.add('show');
+  clearInterval(lightTimer);
+  lightTimer = setInterval(checkLight, 600);
+}
+
+function stopCameraGuide() {
+  clearInterval(lightTimer);
+  lightTimer = null;
+  cameraGuide.classList.remove('show');
+}
+
 
 /* ------------------------------------------------------------
    Handle chosen/captured image -> preview -> send to API
@@ -1300,9 +1744,14 @@ function stopCamera() {
 // mirrored: the photo was flipped like a mirror (front-camera capture), which
 // the AI needs to tell the left cheek from the right one.
 function handleImageFile(file, mirrored = false) {
+  if (scanPanel.classList.contains('scanning')) return;  // one analysis at a time
+  if (cameraStream) stopCamera();
   dropZone.style.display = 'none';
+  retakeBar.style.display = 'none';
+  if (previewImg.src && previewImg.src.startsWith('blob:')) URL.revokeObjectURL(previewImg.src);
   previewImg.src = URL.createObjectURL(file);
   previewImg.style.display = 'block';
+  hasPhoto = true;
   submitForAnalysis(file, mirrored);
 }
 
@@ -1335,7 +1784,7 @@ async function submitForAnalysis(file, mirrored = false) {
     } catch {
       throw new Error(`API error ${res.status} (no response body)`);
     }
-    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+    if (!res.ok || !json.success) throw new Error(`API error ${res.status}: ` + (json.message || '') + (json.detail ? ` (${json.detail})` : ''));
     renderResults(json.data);
   } catch (err) {
     console.error('Analysis failed:', err);
@@ -1349,11 +1798,18 @@ async function submitForAnalysis(file, mirrored = false) {
     );
     dropZone.style.display = 'block';
     previewImg.style.display = 'none';
+    hasPhoto = false;
   } finally {
     scanPanel.classList.remove('scanning');
+    if (hasPhoto) retakeBar.style.display = 'flex';
   }
 }
 
+
+/* Wake the AI service (Render free tier sleeps after 15 min) as soon as the page
+   opens, so it is usually awake by the time the user picks a photo. */
+const AI_WARMUP_URL = 'https://skinglow-ai-service.onrender.com/health';
+try { fetch(AI_WARMUP_URL, { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch (e) {}
 
 /* ------------------------------------------------------------
    Render results
@@ -1415,14 +1871,10 @@ function escapeHtml(text) {
   }[c]));
 }
 
-function renderZones(zones, zoneModelType) {
-  zoneGrid.innerHTML = '';
-  if (!zones.length) {
-    zoneBlock.style.display = 'none';
-    return;
-  }
-  zoneBlock.style.display = 'block';
-  const sorted = [...zones].sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone));
+/** Builds the per-zone cards (forehead / cheeks / nose / under-eye / chin) into `grid`. */
+function buildZoneCards(grid, zones) {
+  grid.innerHTML = '';
+  const sorted = [...(zones || [])].sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone));
   sorted.forEach(z => {
     const score = Math.round(z.score ?? 0);
     const issues = (z.issues || []).map(i => {
@@ -1440,8 +1892,31 @@ function renderZones(zones, zoneModelType) {
       <div class="z-bar"><span style="width:${Math.max(0, Math.min(100, score))}%"></span></div>
       <div class="z-issues">${issues || '<span class="z-clear">ไม่พบปัญหาชัดเจน</span>'}</div>
     `;
-    zoneGrid.appendChild(card);
+    grid.appendChild(card);
   });
+}
+
+/** One-line summary from the zone results, e.g. "สิว: คาง · จุดด่างดำ: แก้มซ้าย, แก้มขวา". */
+function summaryFromZones(zones) {
+  const byIssue = {};
+  [...(zones || [])]
+    .sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone))
+    .forEach(z => (z.issues || []).forEach(i => {
+      const key = i.label_th || i.label;
+      (byIssue[key] = byIssue[key] || []).push(z.name_th || z.zone);
+    }));
+  const parts = Object.entries(byIssue).map(([issue, names]) => `${issue}: ${names.join(', ')}`);
+  return parts.length ? parts.join(' · ') : 'ไม่พบปัญหาผิวที่ชัดเจนในทุกโซน';
+}
+
+function renderZones(zones, zoneModelType) {
+  if (!zones.length) {
+    zoneGrid.innerHTML = '';
+    zoneBlock.style.display = 'none';
+    return;
+  }
+  zoneBlock.style.display = 'block';
+  buildZoneCards(zoneGrid, zones);
   zoneNote.textContent = zoneModelType === 'zone_classifier'
     ? 'วิเคราะห์ด้วยโมเดลจำแนกรายโซน · % คือความมั่นใจของโมเดล'
     : 'วิเคราะห์จากจุดที่ตรวจพบในแต่ละโซน · % คือความมั่นใจของโมเดล';
@@ -1489,6 +1964,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
    with a synthetic demo seed shown only until the user has real scans.
 ================================================================= */
 const HISTORY_URL = "../backend-php/api/history.php";
+const DELETE_ANALYSIS_URL = "../backend-php/api/delete_analysis.php";
 const ISSUE_LABELS = ['acne', 'black_spot', 'eyebag', 'redness', 'oiliness', 'wrinkle'];
 let scanHistory = [];
 let usingRealHistory = false; // true once at least one real scan exists — hides the synthetic demo seed
@@ -1507,6 +1983,7 @@ function pushToHistory(data) {
     label: 'สแกนของคุณ',
     skin_score: data.skin_score,
     counts: detectionsToCounts(data.detections),
+    zones: data.zones || [],
     image: data.processed_image,
     isReal: true,
   });
@@ -1533,7 +2010,7 @@ async function fetchRealHistory() {
       return [];
     }
     const json = await res.json();
-    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+    if (!res.ok || !json.success) throw new Error(`API error ${res.status}: ` + (json.message || '') + (json.detail ? ` (${json.detail})` : ''));
 
     return json.data
       .map(row => ({
@@ -1542,6 +2019,7 @@ async function fetchRealHistory() {
         label: new Date(row.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
         skin_score: row.skin_score,
         counts: detectionsToCounts(row.detections),
+        zones: row.zones || [],
         image: row.processed_image,
         isReal: true,
       }))
@@ -1666,7 +2144,9 @@ function renderHistoryList() {
            e.skin_score !== undefined)
             ? Math.round(e.skin_score)
             : '—';
-        const summary = summaryFromCounts(e.counts);
+        const summary = (e.zones && e.zones.length)
+          ? summaryFromZones(e.zones)
+          : summaryFromCounts(e.counts);
         return `
           <div
             class="history-row"
@@ -1692,12 +2172,28 @@ function renderHistoryList() {
             <div class="h-score">
               ${scoreStr}
             </div>
+            ${e.isReal && e.id ? `
+            <button
+              type="button"
+              class="h-delete"
+              data-delete-id="${e.id}"
+              title="ลบผลวิเคราะห์นี้"
+              aria-label="ลบผลวิเคราะห์ ${dateStr}"
+            >🗑</button>` : ''}
           </div>`;
       }).join('')}
     </div>`;
   /* ----------------------------------------------------------
      Click / Touch history row
   ----------------------------------------------------------- */
+  wrap.querySelectorAll('.h-delete').forEach(btn => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation(); // don't open the image viewer
+      deleteHistoryEntry(Number(btn.dataset.deleteId), btn);
+    });
+    btn.addEventListener('keydown', (event) => event.stopPropagation());
+  });
+
   wrap.querySelectorAll('.history-row').forEach(row => {
 
     row.addEventListener('click', () => {
@@ -1724,6 +2220,51 @@ function renderHistoryList() {
     });
 
   });
+}
+
+/** Deletes one of the user's own analyses (row + images) after confirmation,
+ *  then refreshes the history list, chart and compare view. */
+async function deleteHistoryEntry(id, btn) {
+  if (!id) return;
+  if (!confirm('ลบผลวิเคราะห์และรูปภาพนี้ออกจากประวัติ?\nลบแล้วจะกู้คืนไม่ได้')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(DELETE_ANALYSIS_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (res.status === 401) {
+      localStorage.removeItem('skinglow_token');
+      localStorage.removeItem('skinglow_user');
+      window.location.href = LOGIN_PAGE_URL;
+      return;
+    }
+    let json = {};
+    try { json = await res.json(); } catch {}
+    if (!res.ok || !json.success) throw new Error(json.message || `API error ${res.status}`);
+
+    scanHistory = scanHistory.filter(e => !(e.isReal && e.id === id));
+    if (!scanHistory.some(e => e.isReal)) {
+      scanHistory = [];
+      usingRealHistory = false;
+      seedScanHistory(); // no real scans left — back to the example data
+    }
+    renderInsightChart();
+    if (tabSections.compare.classList.contains('active-tab')) renderCompareView();
+  } catch (err) {
+    console.error('Delete analysis failed:', err);
+    if (btn) btn.disabled = false;
+    const wrap = document.getElementById('historyListWrap');
+    if (wrap) {
+      const note = document.createElement('p');
+      note.className = 'history-delete-error';
+      note.style.cssText = 'color:#B0546A; font-size:.85rem; margin:8px 0 0;';
+      note.textContent = 'ลบไม่สำเร็จ: ' + (err.message || 'เกิดข้อผิดพลาด') + ' กรุณาลองใหม่';
+      wrap.querySelectorAll('.history-delete-error').forEach(n => n.remove());
+      wrap.prepend(note);
+    }
+  }
 }
 
 function summaryFromCounts(counts) {
@@ -1799,6 +2340,15 @@ function renderInsightChart() {
 /* ================================================================
    COMPARE MY SKIN
 ================================================================= */
+/* Which two scans Compare shows. Keys survive re-renders; null = default
+ * (the latest scan vs the one before it). */
+let compareKeyBefore = null;
+let compareKeyAfter = null;
+
+function compareKey(entry, idx) {
+  return entry.isReal && entry.id ? 'id' + entry.id : 'seed' + idx;
+}
+
 function renderCompareView() {
   const el = document.getElementById('compareContent');
 
@@ -1810,10 +2360,66 @@ function renderCompareView() {
     return;
   }
 
-  const current = scanHistory[scanHistory.length - 1];
-  const previous = scanHistory[scanHistory.length - 2];
-
   const fmtDate = (d) => d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  const fmtDateTime = (e) => e.isReal
+    ? e.date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : `${e.label} (ตัวอย่าง)`;
+
+  // scanHistory is oldest first
+  const keys = scanHistory.map((e, i) => compareKey(e, i));
+  let bi = keys.indexOf(compareKeyBefore);
+  let ai = keys.indexOf(compareKeyAfter);
+  if (bi < 0 || ai < 0) { bi = scanHistory.length - 2; ai = scanHistory.length - 1; }
+  if (bi > ai) [bi, ai] = [ai, bi];           // left is always the older scan
+  compareKeyBefore = keys[bi];
+  compareKeyAfter = keys[ai];
+
+  const options = (selIdx) => scanHistory.map((e, i) => `
+      <option value="${keys[i]}" ${i === selIdx ? 'selected' : ''}>
+        ${fmtDateTime(e)} · คะแนน ${e.skin_score != null ? Math.round(e.skin_score) : '—'}
+      </option>`).reverse().join(''); // newest first in the list
+
+  const picker = `
+    <div class="compare-picker">
+      <div class="cp-field">
+        <label for="compareBefore">ครั้งก่อน</label>
+        <select id="compareBefore">${options(bi)}</select>
+      </div>
+      <div class="cp-field">
+        <label for="compareAfter">ครั้งหลัง</label>
+        <select id="compareAfter">${options(ai)}</select>
+      </div>
+      <div class="cp-quick">
+        <button type="button" class="chip-btn" data-quick="prev">ล่าสุด กับ ครั้งก่อนหน้า</button>
+        <button type="button" class="chip-btn" data-quick="first">ล่าสุด กับ ครั้งแรก</button>
+      </div>
+    </div>`;
+
+  const bindPicker = () => {
+    const selB = document.getElementById('compareBefore');
+    const selA = document.getElementById('compareAfter');
+    const apply = () => { compareKeyBefore = selB.value; compareKeyAfter = selA.value; renderCompareView(); };
+    selB.addEventListener('change', apply);
+    selA.addEventListener('change', apply);
+    el.querySelectorAll('[data-quick]').forEach(btn => btn.addEventListener('click', () => {
+      const last = scanHistory.length - 1;
+      compareKeyAfter = keys[last];
+      compareKeyBefore = keys[btn.dataset.quick === 'first' ? 0 : last - 1];
+      renderCompareView();
+    }));
+  };
+
+  if (bi === ai) {
+    el.innerHTML = picker + `
+      <div class="empty-state">
+        <p>เลือกผลวิเคราะห์ 2 ครั้งที่ต่างกันเพื่อเปรียบเทียบ</p>
+      </div>`;
+    bindPicker();
+    return;
+  }
+
+  const previous = scanHistory[bi];
+  const current = scanHistory[ai];
 
   const deltaRows = ISSUE_LABELS.map(label => {
     const before = previous.counts[label] || 0;
@@ -1829,13 +2435,16 @@ function renderCompareView() {
   const scoreCls = scoreDiff > 0 ? 'delta-down' : (scoreDiff < 0 ? 'delta-up' : 'delta-flat');
   // note: higher score = healthier skin, so an increase is "good" (shown green via delta-down class)
 
-  el.innerHTML = `
+  const days = Math.round((current.date - previous.date) / 86400000);
+  const gap = days >= 1 ? `ห่างกัน ${days} วัน` : 'วันเดียวกัน';
+
+  el.innerHTML = picker + `
     <div class="compare-grid">
       <div class="compare-card">
-        <img class="cc-image" src="${previous.image}" alt="ผลวิเคราะห์ก่อนหน้า">
+        <img class="cc-image" src="${previous.image}" alt="ผลวิเคราะห์ครั้งก่อน">
         <div class="cc-body">
           <div class="cc-date">${previous.isReal ? fmtDate(previous.date) : previous.label}</div>
-          <h3>ก่อนหน้า</h3>
+          <h3>ครั้งก่อน</h3>
           <div class="score-card" style="padding:14px;">
             <div class="score-ring" style="width:56px;height:56px;--pct:${Math.round(previous.skin_score||0)}">
               <div class="score-ring-inner" style="width:44px;height:44px;font-size:1rem;">${Math.round(previous.skin_score||0)}</div>
@@ -1847,6 +2456,7 @@ function renderCompareView() {
 
       <div class="compare-vs">
         <span class="arrow">→</span>
+        <div class="cp-gap">${gap}</div>
         <div class="delta-list" style="min-width:150px;">
           <div class="delta-row"><span>คะแนนผิว</span><span class="${scoreCls}">${scoreDiff > 0 ? '+' : ''}${scoreDiff}</span></div>
           ${deltaRows}
@@ -1854,10 +2464,10 @@ function renderCompareView() {
       </div>
 
       <div class="compare-card">
-        <img class="cc-image" src="${current.image}" alt="ผลวิเคราะห์ปัจจุบัน">
+        <img class="cc-image" src="${current.image}" alt="ผลวิเคราะห์ครั้งหลัง">
         <div class="cc-body">
           <div class="cc-date">${current.isReal ? fmtDate(current.date) : current.label}</div>
-          <h3>ปัจจุบัน</h3>
+          <h3>${ai === scanHistory.length - 1 ? 'ล่าสุด' : 'ครั้งหลัง'}</h3>
           <div class="score-card" style="padding:14px;">
             <div class="score-ring" style="width:56px;height:56px;--pct:${Math.round(current.skin_score||0)}">
               <div class="score-ring-inner" style="width:44px;height:44px;font-size:1rem;">${Math.round(current.skin_score||0)}</div>
@@ -1868,6 +2478,7 @@ function renderCompareView() {
       </div>
     </div>
   `;
+  bindPicker();
 }
 
 /* ================================================================
@@ -2077,6 +2688,12 @@ const historyModalDate =
   document.getElementById('historyModalDate');
 const historyModalSummary =
   document.getElementById('historyModalSummary');
+const historyModalZones =
+  document.getElementById('historyModalZones');
+const historyModalZoneGrid =
+  document.getElementById('historyModalZoneGrid');
+const historyModalContent =
+  historyImageModal.querySelector('.history-modal-content');
 /* ---------------------------------------------------------------
    Zoom state
 ---------------------------------------------------------------- */
@@ -2136,8 +2753,17 @@ function openHistoryImageModal(entry) {
       : '—';
   historyModalDate.textContent =
     `${dateStr} • คะแนนผิว ${scoreStr}`;
-  historyModalSummary.textContent =
-    summaryFromCounts(entry.counts);
+  const hasZones = Array.isArray(entry.zones) && entry.zones.length > 0;
+  historyModalSummary.textContent = hasZones
+    ? summaryFromZones(entry.zones)
+    : summaryFromCounts(entry.counts);
+  if (hasZones) {
+    buildZoneCards(historyModalZoneGrid, entry.zones);
+  } else {
+    historyModalZoneGrid.innerHTML = '';
+  }
+  historyModalZones.hidden = !hasZones;
+  historyModalContent.classList.toggle('has-zones', hasZones);
   resetHistoryImageZoom();
   historyImageModal.classList.add('open');
   historyImageModal.setAttribute(

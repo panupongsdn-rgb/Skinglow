@@ -22,8 +22,9 @@ services:
     plan: free
     rootDir: ai-service
     buildCommand: >
-      pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu &&
-      pip install -r requirements.txt
+      pip install -r requirements.txt &&
+      pip uninstall -y opencv-python opencv-contrib-python opencv-python-headless &&
+      pip install --no-deps opencv-contrib-python-headless==4.10.0.84
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

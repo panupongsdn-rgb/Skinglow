@@ -47,8 +47,12 @@ import os
 from typing import Dict, List, Optional
 
 import numpy as np
-from ensemble_boxes import weighted_boxes_fusion
-from ultralytics import YOLO
+from wbf import weighted_boxes_fusion  # vendored, see wbf.py
+
+# A member runs from <name>.onnx (onnxruntime, no PyTorch — fits a 512 MB host)
+# when that file exists next to the .pt; otherwise from the .pt via ultralytics.
+# Set SKINGLOW_RUNTIME=torch to force the .pt files.
+RUNTIME = os.getenv("SKINGLOW_RUNTIME", "auto").lower()
 
 CANONICAL_LABELS = ["acne", "black_spot", "eyebag", "oiliness", "redness", "wrinkle"]
 LABEL_TO_IDX = {name: i for i, name in enumerate(CANONICAL_LABELS)}
@@ -100,16 +104,33 @@ class EnsembleMember:
         self.path = os.path.join(MODELS_DIR, file)
         self.weight = weight
         self.label_map = label_map
-        self.model: Optional[YOLO] = None
+        self.model = None
+        self.runtime: Optional[str] = None
         self.load_error: Optional[str] = None
 
+        onnx_path = os.path.splitext(self.path)[0] + ".onnx"
+        if RUNTIME != "torch" and os.path.exists(onnx_path):
+            try:
+                from onnx_models import OnnxYolo
+                self.model, self.runtime, self.path = OnnxYolo(onnx_path), "onnxruntime", onnx_path
+                return
+            except Exception as exc:
+                self.load_error = f"onnx: {exc}"
         if not os.path.exists(self.path):
-            self.load_error = f"file not found: {self.path}"
+            self.load_error = self.load_error or f"file not found: {self.path}"
             return
         try:
-            self.model = YOLO(self.path)
+            from ultralytics import YOLO
+            self.model, self.runtime, self.load_error = YOLO(self.path), "torch", None
         except Exception as exc:
             self.load_error = str(exc)
+
+    def detect(self, bgr: np.ndarray, conf: float):
+        """(xyxy pixel boxes, confidences, class ids) from either runtime."""
+        if self.runtime == "onnxruntime":
+            return self.model.detect(bgr, conf)
+        r = self.model.predict(bgr, conf=conf, verbose=False)[0]
+        return r.boxes.xyxy.cpu().numpy(), r.boxes.conf.cpu().numpy(), r.boxes.cls.cpu().numpy().astype(int)
 
     @property
     def available(self) -> bool:
@@ -121,7 +142,7 @@ def load_ensemble() -> List[EnsembleMember]:
     for cfg in ENSEMBLE_CONFIG:
         member = EnsembleMember(cfg["file"], cfg["weight"], cfg["label_map"])
         if member.available:
-            print(f"[ensemble] loaded {cfg['file']} — classes: {member.model.names}")
+            print(f"[ensemble] loaded {os.path.basename(member.path)} ({member.runtime}) — classes: {member.model.names}")
             unmapped = [n for n in member.model.names.values() if resolve_label(member, n) is None]
             if unmapped:
                 print(f"[ensemble] WARNING {cfg['file']}: these classes will be IGNORED "
@@ -168,21 +189,20 @@ def resolve_label(member: "EnsembleMember", raw_name: str):
 def _predict_one(member: EnsembleMember, bgr: np.ndarray, conf: float, img_w: int, img_h: int):
     """Run one model and return (boxes_norm, scores, canonical_label_indices)
     filtered to only classes present in this project's taxonomy."""
-    results = member.model.predict(bgr, conf=conf, verbose=False)[0]
+    xyxy, confs, classes = member.detect(bgr, conf)
 
     boxes, scores, labels = [], [], []
-    for box in results.boxes:
-        raw_name = member.model.names[int(box.cls[0])]
+    for (x0, y0, x1, y1), score, cls in zip(xyxy.tolist(), confs.tolist(), classes.tolist()):
+        raw_name = member.model.names[int(cls)]
         canonical = resolve_label(member, raw_name)
         if canonical is None:
             continue  # class not in our taxonomy, or explicitly dropped
         if canonical not in LABEL_TO_IDX:
             continue  # safety: typo in label_map pointing to an unknown canonical name
 
-        x0, y0, x1, y1 = box.xyxy[0].tolist()
         # WBF expects normalized [0,1] coordinates
         boxes.append([x0 / img_w, y0 / img_h, x1 / img_w, y1 / img_h])
-        scores.append(float(box.conf[0]))
+        scores.append(float(score))
         labels.append(LABEL_TO_IDX[canonical])
 
     return boxes, scores, labels
