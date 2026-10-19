@@ -104,6 +104,8 @@ function callAiService(string $url, string $path, string $mime, string $name, in
         // InfinityFree stops PHP at 60 s, so wait up to 55 s.
         CURLOPT_CONNECTTIMEOUT => $connectTimeout,
         CURLOPT_TIMEOUT        => 55,
+        // proves to the AI service that the request comes from this backend
+        CURLOPT_HTTPHEADER     => AI_SHARED_SECRET !== '' ? ['X-AI-Key: ' . AI_SHARED_SECRET] : [],
         CURLOPT_POSTFIELDS     => [
             'file'     => new CURLFile($path, $mime, $name),
             // front-camera captures are mirrored; the AI needs it to name left/right cheeks correctly

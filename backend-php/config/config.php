@@ -55,6 +55,10 @@ define('AI_SERVICE_FALLBACK_URL',
     AI_SERVICE_URL !== 'https://skinglow-ai-service.onrender.com/analyze' && isLocalRequest()
         ? 'https://skinglow-ai-service.onrender.com/analyze' : '');
 
+// Shared secret sent to the AI service in the X-AI-Key header (must equal
+// AI_SHARED_SECRET on Render). Empty = header not sent.
+define('AI_SHARED_SECRET', getenv('AI_SHARED_SECRET') ?: (localSecrets()['ai_shared_secret'] ?? ''));
+
 // Upload constraints
 define('MAX_UPLOAD_SIZE', 8 * 1024 * 1024); // 8 MB
 define('ALLOWED_MIME_TYPES', ['image/jpeg', 'image/png', 'image/webp']);

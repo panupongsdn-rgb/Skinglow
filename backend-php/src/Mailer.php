@@ -37,7 +37,7 @@ final class Mailer
             'user'      => $get('SMTP_USER', 'user'),
             'pass'      => $get('SMTP_PASS', 'pass'),
             'from'      => $get('SMTP_FROM', 'from'),
-            'from_name' => $get('SMTP_FROM_NAME', 'from_name', 'Skinglow'),
+            'from_name' => $get('SMTP_FROM_NAME', 'from_name', 'Skin-Glow'),
         ];
     }
 
@@ -100,7 +100,7 @@ final class Mailer
 
         $html = <<<HTML
 <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#241A33">
-  <h2 style="color:#3B2A54">Skinglow — ตั้งรหัสผ่านใหม่</h2>
+  <h2 style="color:#3B2A54">Skin-Glow — ตั้งรหัสผ่านใหม่</h2>
   <p>สวัสดีคุณ {$safeName}</p>
   <p>เราได้รับคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ กดปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่
      (ลิงก์ใช้ได้ {$validMinutes} นาที และใช้ได้เพียงครั้งเดียว)</p>
@@ -112,10 +112,10 @@ final class Mailer
 </div>
 HTML;
 
-        $text = "Skinglow — ตั้งรหัสผ่านใหม่\n\nสวัสดีคุณ {$toName}\n\n"
+        $text = "Skin-Glow — ตั้งรหัสผ่านใหม่\n\nสวัสดีคุณ {$toName}\n\n"
               . "เปิดลิงก์นี้เพื่อตั้งรหัสผ่านใหม่ (ใช้ได้ {$validMinutes} นาที ครั้งเดียว):\n{$resetLink}\n\n"
               . "ถ้าคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องทำอะไร";
 
-        return self::send($toEmail, $toName, 'Skinglow — ตั้งรหัสผ่านใหม่', $html, $text);
+        return self::send($toEmail, $toName, 'Skin-Glow — ตั้งรหัสผ่านใหม่', $html, $text);
     }
 }

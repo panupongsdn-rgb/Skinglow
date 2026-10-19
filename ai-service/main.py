@@ -59,6 +59,7 @@ try:
 except (OSError, AttributeError):
     pass
 
+import hmac
 import io
 import threading
 from typing import List, Tuple, Optional
@@ -66,7 +67,7 @@ from typing import List, Tuple, Optional
 import cv2
 import numpy as np
 import mediapipe as mp
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from PIL import Image, ImageOps
@@ -864,10 +865,20 @@ def resize_for_processing(pil_img: Image.Image):
 _ANALYSIS_LOCK = threading.Lock()
 
 
+# Shared secret between the PHP backend and this service. When AI_SHARED_SECRET
+# is set (Render -> Environment), /analyze only accepts requests that send the
+# same value in the X-AI-Key header, so the public URL cannot be used directly.
+# Unset = open (local development). /health always stays public.
+AI_SHARED_SECRET = os.getenv("AI_SHARED_SECRET", "")
+
+
 @app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(file: UploadFile = File(...), mirrored: bool = Form(False)):
+async def analyze(file: UploadFile = File(...), mirrored: bool = Form(False),
+                  x_ai_key: Optional[str] = Header(None)):
     """`mirrored`: the photo is a mirror image (front-camera capture flipped
     like a mirror), so the subject's left cheek is on the image's LEFT."""
+    if AI_SHARED_SECRET and not hmac.compare_digest(x_ai_key or "", AI_SHARED_SECRET):
+        raise HTTPException(status_code=401, detail="Missing or invalid X-AI-Key.")
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=415, detail="Unsupported image type.")
 
