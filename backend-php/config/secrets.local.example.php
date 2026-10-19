@@ -36,6 +36,11 @@ return [
     // Optional, localhost only: your own AI service instead of Render
     // 'ai_service_url' => 'http://127.0.0.1:8000/analyze',
 
+    // Same value as AI_SHARED_SECRET in Render -> Environment. Sent as the
+    // X-AI-Key header so only this backend can call /analyze.
+    // Generate one with:  php -r "echo bin2hex(random_bytes(24));"
+    'ai_shared_secret' => 'PUT_THE_SAME_SECRET_AS_ON_RENDER',
+
     // Gmail SMTP for "forgot password" (use a Google App Password)
     'smtp' => [
         'host'      => 'smtp.gmail.com',
@@ -44,6 +49,6 @@ return [
         'user'      => 'you@gmail.com',
         'pass'      => 'GOOGLE_APP_PASSWORD',
         'from'      => 'you@gmail.com',
-        'from_name' => 'SkinGlow',
+        'from_name' => 'Skin-Glow',
     ],
 ];
