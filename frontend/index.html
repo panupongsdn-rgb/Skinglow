@@ -543,6 +543,17 @@
 
   /* ---- Compare view ---- */
   .compare-grid{display:grid; grid-template-columns:1fr auto 1fr; gap:24px; align-items:start;}
+  .compare-picker{display:flex; flex-wrap:wrap; gap:12px 16px; align-items:flex-end; margin:0 0 20px;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
+  .compare-picker .cp-field{display:flex; flex-direction:column; gap:6px; flex:1 1 220px; min-width:0;}
+  .compare-picker label{font-size:.78rem; font-weight:600; color:var(--ink-soft);}
+  .compare-picker select{font:inherit; font-size:.88rem; padding:9px 10px; border-radius:10px;
+    border:1px solid var(--line); background:#fff; color:var(--ink); width:100%;}
+  .compare-picker .cp-quick{display:flex; flex-wrap:wrap; gap:8px; flex:1 1 100%;}
+  .chip-btn{font:inherit; font-size:.78rem; padding:6px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:#fff; color:var(--sage-deep);}
+  .chip-btn:hover{background:var(--sage-deep); color:#fff; border-color:var(--sage-deep);}
+  .cp-gap{font-size:.75rem; color:var(--ink-soft); text-align:center; margin:4px 0 8px;}
   .compare-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
   .compare-card .cc-image{width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--ivory);}
   .compare-card .cc-body{padding:18px 20px;}
@@ -1202,7 +1213,7 @@ main{
 <div id="compareTab" class="tab-section">
   <div class="panel-head">
     <h2>Compare My Skin</h2>
-    <p>เปรียบเทียบผลวิเคราะห์ผิวล่าสุดของคุณกับครั้งก่อนหน้า เพื่อดูว่าดีขึ้นหรือแย่ลง</p>
+    <p>เลือกผลวิเคราะห์ 2 ครั้งใดก็ได้มาเปรียบเทียบ เพื่อดูว่าผิวดีขึ้นหรือแย่ลง (ค่าเริ่มต้นคือครั้งล่าสุดกับครั้งก่อนหน้า)</p>
   </div>
   <div id="compareContent"></div>
 </div>
@@ -2329,6 +2340,15 @@ function renderInsightChart() {
 /* ================================================================
    COMPARE MY SKIN
 ================================================================= */
+/* Which two scans Compare shows. Keys survive re-renders; null = default
+ * (the latest scan vs the one before it). */
+let compareKeyBefore = null;
+let compareKeyAfter = null;
+
+function compareKey(entry, idx) {
+  return entry.isReal && entry.id ? 'id' + entry.id : 'seed' + idx;
+}
+
 function renderCompareView() {
   const el = document.getElementById('compareContent');
 
@@ -2340,10 +2360,66 @@ function renderCompareView() {
     return;
   }
 
-  const current = scanHistory[scanHistory.length - 1];
-  const previous = scanHistory[scanHistory.length - 2];
-
   const fmtDate = (d) => d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  const fmtDateTime = (e) => e.isReal
+    ? e.date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : `${e.label} (ตัวอย่าง)`;
+
+  // scanHistory is oldest first
+  const keys = scanHistory.map((e, i) => compareKey(e, i));
+  let bi = keys.indexOf(compareKeyBefore);
+  let ai = keys.indexOf(compareKeyAfter);
+  if (bi < 0 || ai < 0) { bi = scanHistory.length - 2; ai = scanHistory.length - 1; }
+  if (bi > ai) [bi, ai] = [ai, bi];           // left is always the older scan
+  compareKeyBefore = keys[bi];
+  compareKeyAfter = keys[ai];
+
+  const options = (selIdx) => scanHistory.map((e, i) => `
+      <option value="${keys[i]}" ${i === selIdx ? 'selected' : ''}>
+        ${fmtDateTime(e)} · คะแนน ${e.skin_score != null ? Math.round(e.skin_score) : '—'}
+      </option>`).reverse().join(''); // newest first in the list
+
+  const picker = `
+    <div class="compare-picker">
+      <div class="cp-field">
+        <label for="compareBefore">ครั้งก่อน</label>
+        <select id="compareBefore">${options(bi)}</select>
+      </div>
+      <div class="cp-field">
+        <label for="compareAfter">ครั้งหลัง</label>
+        <select id="compareAfter">${options(ai)}</select>
+      </div>
+      <div class="cp-quick">
+        <button type="button" class="chip-btn" data-quick="prev">ล่าสุด กับ ครั้งก่อนหน้า</button>
+        <button type="button" class="chip-btn" data-quick="first">ล่าสุด กับ ครั้งแรก</button>
+      </div>
+    </div>`;
+
+  const bindPicker = () => {
+    const selB = document.getElementById('compareBefore');
+    const selA = document.getElementById('compareAfter');
+    const apply = () => { compareKeyBefore = selB.value; compareKeyAfter = selA.value; renderCompareView(); };
+    selB.addEventListener('change', apply);
+    selA.addEventListener('change', apply);
+    el.querySelectorAll('[data-quick]').forEach(btn => btn.addEventListener('click', () => {
+      const last = scanHistory.length - 1;
+      compareKeyAfter = keys[last];
+      compareKeyBefore = keys[btn.dataset.quick === 'first' ? 0 : last - 1];
+      renderCompareView();
+    }));
+  };
+
+  if (bi === ai) {
+    el.innerHTML = picker + `
+      <div class="empty-state">
+        <p>เลือกผลวิเคราะห์ 2 ครั้งที่ต่างกันเพื่อเปรียบเทียบ</p>
+      </div>`;
+    bindPicker();
+    return;
+  }
+
+  const previous = scanHistory[bi];
+  const current = scanHistory[ai];
 
   const deltaRows = ISSUE_LABELS.map(label => {
     const before = previous.counts[label] || 0;
@@ -2359,13 +2435,16 @@ function renderCompareView() {
   const scoreCls = scoreDiff > 0 ? 'delta-down' : (scoreDiff < 0 ? 'delta-up' : 'delta-flat');
   // note: higher score = healthier skin, so an increase is "good" (shown green via delta-down class)
 
-  el.innerHTML = `
+  const days = Math.round((current.date - previous.date) / 86400000);
+  const gap = days >= 1 ? `ห่างกัน ${days} วัน` : 'วันเดียวกัน';
+
+  el.innerHTML = picker + `
     <div class="compare-grid">
       <div class="compare-card">
-        <img class="cc-image" src="${previous.image}" alt="ผลวิเคราะห์ก่อนหน้า">
+        <img class="cc-image" src="${previous.image}" alt="ผลวิเคราะห์ครั้งก่อน">
         <div class="cc-body">
           <div class="cc-date">${previous.isReal ? fmtDate(previous.date) : previous.label}</div>
-          <h3>ก่อนหน้า</h3>
+          <h3>ครั้งก่อน</h3>
           <div class="score-card" style="padding:14px;">
             <div class="score-ring" style="width:56px;height:56px;--pct:${Math.round(previous.skin_score||0)}">
               <div class="score-ring-inner" style="width:44px;height:44px;font-size:1rem;">${Math.round(previous.skin_score||0)}</div>
@@ -2377,6 +2456,7 @@ function renderCompareView() {
 
       <div class="compare-vs">
         <span class="arrow">→</span>
+        <div class="cp-gap">${gap}</div>
         <div class="delta-list" style="min-width:150px;">
           <div class="delta-row"><span>คะแนนผิว</span><span class="${scoreCls}">${scoreDiff > 0 ? '+' : ''}${scoreDiff}</span></div>
           ${deltaRows}
@@ -2384,10 +2464,10 @@ function renderCompareView() {
       </div>
 
       <div class="compare-card">
-        <img class="cc-image" src="${current.image}" alt="ผลวิเคราะห์ปัจจุบัน">
+        <img class="cc-image" src="${current.image}" alt="ผลวิเคราะห์ครั้งหลัง">
         <div class="cc-body">
           <div class="cc-date">${current.isReal ? fmtDate(current.date) : current.label}</div>
-          <h3>ปัจจุบัน</h3>
+          <h3>${ai === scanHistory.length - 1 ? 'ล่าสุด' : 'ครั้งหลัง'}</h3>
           <div class="score-card" style="padding:14px;">
             <div class="score-ring" style="width:56px;height:56px;--pct:${Math.round(current.skin_score||0)}">
               <div class="score-ring-inner" style="width:44px;height:44px;font-size:1rem;">${Math.round(current.skin_score||0)}</div>
@@ -2398,6 +2478,7 @@ function renderCompareView() {
       </div>
     </div>
   `;
+  bindPicker();
 }
 
 /* ================================================================
