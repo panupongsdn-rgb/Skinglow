@@ -183,6 +183,7 @@ class AnalyzeResponse(BaseModel):
     zone_model_type: str = "none"
     model_type: str  # "yolov8_trained" or "heuristic_cv_v2" — tells the frontend/PHP which pipeline produced this
     face_detected: bool = True   # False if no face was located at all (image quality/framing issue)
+    hidden_zones: List[str] = []  # zones left out because they are covered (e.g. hair over the forehead)
     skin_status: str = "issues_found"  # "clear" | "issues_found" | "no_face_detected"
 
 
@@ -736,20 +737,51 @@ DETECTION_PENALTY = 3.0
 MAX_DETECTION_PENALTY = 15.0
 
 
-def analyze_zones(bgr: np.ndarray, detections: List[Detection]) -> List[ZoneResult]:
+# Zones that are often covered (hair / fringe / cap over the forehead). A zone
+# is left out when less than this share of its pixels look like the person's
+# skin. Render -> Environment -> MIN_ZONE_SKIN_FRACTION (0 turns it off).
+OCCLUSION_CHECK_ZONES = ("forehead",)
+MIN_ZONE_SKIN_FRACTION = float(os.getenv("MIN_ZONE_SKIN_FRACTION", "0.45"))
+
+
+def hidden_zone_names(bgr: np.ndarray, zones) -> List[str]:
+    ref_names = [n for n in ("nose", "left_cheek", "right_cheek") if n in zones]
+    if MIN_ZONE_SKIN_FRACTION <= 0 or not ref_names:
+        return []
+    ref = np.zeros(bgr.shape[:2], np.uint8)
+    for n in ref_names:
+        ref |= zones[n].mask
+    hidden = []
+    for n in OCCLUSION_CHECK_ZONES:
+        if n in zones:
+            frac = face_zones.skin_fraction(bgr, zones[n].mask, ref)
+            if frac < MIN_ZONE_SKIN_FRACTION:
+                print(f"[analyze] {n} hidden: skin fraction {frac:.2f} < {MIN_ZONE_SKIN_FRACTION}")
+                hidden.append(n)
+    return hidden
+
+
+def analyze_zones(bgr: np.ndarray, detections: List[Detection]):
     """Split the face into forehead / cheeks / nose / under-eye / chin and
-    judge each zone separately. Returns [] if no face landmarks are found."""
+    judge each zone separately. Returns (zone results, hidden zone names,
+    detections that fall in a hidden zone); ([], [], []) if no face landmarks."""
     zones = face_zones.segment_zones(bgr, landmarks=face_zones.detect_landmarks(bgr, FACE_MESH))
     if not zones:
-        return []
-    names = [n for n in face_zones.ZONE_NAMES if n in zones]
+        return [], [], []
+    hidden = hidden_zone_names(bgr, zones)
 
-    # which zone each YOLO box belongs to
-    per_zone_dets = {n: [] for n in names}
+    # which zone each YOLO box belongs to (decided before hidden zones are removed,
+    # so boxes on the hair are dropped instead of moving to a neighbouring zone)
+    all_names = [n for n in face_zones.ZONE_NAMES if n in zones]
+    per_zone_dets = {n: [] for n in all_names}
+    hidden_dets = []
     for d in detections:
         z = face_zones.zone_of_box(zones, d.box)
-        if z in per_zone_dets:
+        if z in hidden:
+            hidden_dets.append(d)
+        elif z in per_zone_dets:
             per_zone_dets[z].append(d)
+    names = [n for n in all_names if n not in hidden]
 
     # probability of each condition per zone
     probs = {}
@@ -782,7 +814,7 @@ def analyze_zones(bgr: np.ndarray, detections: List[Detection]) -> List[ZoneResu
             score=round(max(0.0, min(100.0, score)), 1), issues=issues,
             detection_count=len(per_zone_dets[n]),
         ))
-    return results
+    return results, hidden, hidden_dets
 
 
 _SWAP_SIDE = {"left_cheek": "right_cheek", "right_cheek": "left_cheek"}
@@ -797,7 +829,7 @@ def apply_zone_analysis(bgr: np.ndarray, result: AnalyzeResponse, mirrored: bool
     if not result.face_detected:
         return result
     try:
-        zones = analyze_zones(bgr, result.detections)
+        zones, hidden, hidden_dets = analyze_zones(bgr, result.detections)
     except Exception as exc:  # zone analysis must never break the main result
         import traceback
         print(f"[analyze] zone analysis failed: {exc!r}")
@@ -805,6 +837,10 @@ def apply_zone_analysis(bgr: np.ndarray, result: AnalyzeResponse, mirrored: bool
         return result
     if not zones:
         return result
+    if hidden:
+        result.hidden_zones = hidden
+        drop = {id(d) for d in hidden_dets}
+        result.detections = [d for d in result.detections if id(d) not in drop]
     if mirrored:
         for z in zones:
             if z.zone in _SWAP_SIDE:

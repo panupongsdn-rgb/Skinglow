@@ -189,6 +189,27 @@ def segment_zones(bgr: np.ndarray, landmarks: Optional[np.ndarray] = None,
     return zones
 
 
+def skin_fraction(bgr: np.ndarray, mask: np.ndarray, ref_mask: np.ndarray,
+                  chroma_tol: float = 14.0, min_luma_ratio: float = 0.55) -> float:
+    """Share of the pixels in `mask` whose colour matches the person's own skin.
+
+    The reference colour is the median YCrCb of `ref_mask` (nose + cheeks,
+    which are rarely covered). A pixel counts as skin when its Cr and Cb are
+    within `chroma_tol` of the reference and it is not much darker than it.
+    Hair, a fringe, a cap or a hand over the forehead fails one of these tests.
+    Returns 1.0 when either mask is empty, so nothing is dropped by accident.
+    """
+    sel, ref = mask > 0, ref_mask > 0
+    if not sel.any() or ref.sum() < 50:
+        return 1.0
+    ycc = cv2.cvtColor(bgr, cv2.COLOR_BGR2YCrCb).astype(np.float32)
+    y0, cr0, cb0 = np.median(ycc[ref], axis=0)
+    px = ycc[sel]
+    ok = ((np.abs(px[:, 1] - cr0) <= chroma_tol) & (np.abs(px[:, 2] - cb0) <= chroma_tol)
+          & (px[:, 0] >= min_luma_ratio * y0))
+    return float(ok.mean())
+
+
 def crop_zone(bgr: np.ndarray, zone: Zone, size: int = 224, pad: float = 0.08,
               blackout: bool = True) -> np.ndarray:
     """Square `size` x `size` crop of a zone for the classifier.
