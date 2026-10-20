@@ -1835,7 +1835,7 @@ function renderResults(data) {
     issueChips.appendChild(chip);
   });
 
-  renderZones(data.zones || [], data.zone_model_type);
+  renderZones(data.zones || [], data.zone_model_type, data.hidden_zones || []);
 
   productList.innerHTML = '';
   (data.recommended_products || []).forEach(p => {
@@ -1909,7 +1909,9 @@ function summaryFromZones(zones) {
   return parts.length ? parts.join(' · ') : 'ไม่พบปัญหาผิวที่ชัดเจนในทุกโซน';
 }
 
-function renderZones(zones, zoneModelType) {
+const HIDDEN_ZONE_TH = { forehead: 'หน้าผาก', chin: 'คาง', nose: 'จมูก', under_eye: 'ใต้ตา', left_cheek: 'แก้มซ้าย', right_cheek: 'แก้มขวา' };
+
+function renderZones(zones, zoneModelType, hiddenZones = []) {
   if (!zones.length) {
     zoneGrid.innerHTML = '';
     zoneBlock.style.display = 'none';
@@ -1920,6 +1922,10 @@ function renderZones(zones, zoneModelType) {
   zoneNote.textContent = zoneModelType === 'zone_classifier'
     ? 'วิเคราะห์ด้วยโมเดลจำแนกรายโซน · % คือความมั่นใจของโมเดล'
     : 'วิเคราะห์จากจุดที่ตรวจพบในแต่ละโซน · % คือความมั่นใจของโมเดล';
+  if (hiddenZones.length) {
+    const names = hiddenZones.map(z => HIDDEN_ZONE_TH[z] || z).join(', ');
+    zoneNote.textContent += ` · ไม่ได้ประเมิน${names} เพราะมีผมหรือสิ่งอื่นบังอยู่ หากต้องการผลของโซนนี้ให้เปิดหน้าผากแล้วถ่ายใหม่`;
+  }
 }
 
 /* ================================================================
@@ -1977,6 +1983,7 @@ function detectionsToCounts(detections) {
 }
 
 function pushToHistory(data) {
+  if (!usingRealHistory) scanHistory = []; // first real scan replaces the example data
   scanHistory.push({
     id: data.analysis_id ?? null,
     date: new Date(),
@@ -2352,10 +2359,12 @@ function compareKey(entry, idx) {
 function renderCompareView() {
   const el = document.getElementById('compareContent');
 
-  if (scanHistory.length < 2) {
+  // compare only the user's own scans — never the example data
+  const realCount = usingRealHistory ? scanHistory.filter(e => e.isReal).length : 0;
+  if (realCount < 2) {
     el.innerHTML = `
       <div class="empty-state">
-        <p>ต้องมีผลวิเคราะห์อย่างน้อย 2 ครั้งจึงจะเปรียบเทียบได้ ลองสแกนผิวของคุณอีกครั้ง</p>
+        <p>ต้องมีผลวิเคราะห์อย่างน้อย 2 ครั้งจึงจะเปรียบเทียบได้ (ตอนนี้มี ${realCount} ครั้ง) ลองสแกนผิวของคุณอีกครั้ง</p>
       </div>`;
     return;
   }

@@ -280,6 +280,7 @@ respond(200, [
         'detections'       => $detections,
         'zones'            => $zones,
         'zone_model_type'  => $aiResult['zone_model_type'] ?? 'none',
+        'hidden_zones'     => $aiResult['hidden_zones'] ?? [],
         'original_image'   => APP_BASE_URL . '/uploads/original/' . $uniqueName,
         'processed_image'  => APP_BASE_URL . '/uploads/processed/' . basename($processedPath),
         'recommended_products' => $recommendedProducts,
