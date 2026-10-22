@@ -109,13 +109,19 @@ final class Mailer
   </p>
   <p style="font-size:13px;color:#7A6C8E">ถ้าปุ่มกดไม่ได้ ให้คัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:<br>{$safeLink}</p>
   <p style="font-size:13px;color:#7A6C8E">ถ้าคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องทำอะไร — รหัสผ่านเดิมยังใช้ได้ตามปกติ</p>
+  <hr style="border:0;border-top:1px solid #E4DCEC;margin:24px 0">
+  <p lang="en" style="font-size:13px;color:#7A6C8E"><strong>English:</strong> We received a request to reset the password
+     for your Skin-Glow account. Use the button above (or the link) to set a new password. The link works once and expires
+     in {$validMinutes} minutes. If you did not ask for this, ignore this email — your password stays the same.</p>
 </div>
 HTML;
 
         $text = "Skin-Glow — ตั้งรหัสผ่านใหม่\n\nสวัสดีคุณ {$toName}\n\n"
               . "เปิดลิงก์นี้เพื่อตั้งรหัสผ่านใหม่ (ใช้ได้ {$validMinutes} นาที ครั้งเดียว):\n{$resetLink}\n\n"
-              . "ถ้าคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องทำอะไร";
+              . "ถ้าคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องทำอะไร\n\n"
+              . "---\nReset your Skin-Glow password with the link above (works once, expires in {$validMinutes} minutes).\n"
+              . "If you did not ask for this, ignore this email.";
 
-        return self::send($toEmail, $toName, 'Skin-Glow — ตั้งรหัสผ่านใหม่', $html, $text);
+        return self::send($toEmail, $toName, 'Skin-Glow — ตั้งรหัสผ่านใหม่ / Reset your password', $html, $text);
     }
 }
