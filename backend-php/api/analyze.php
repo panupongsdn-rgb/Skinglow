@@ -6,8 +6,12 @@
  * AI service, draws bounding boxes on the result, stores everything in
  * MySQL, and returns a JSON response to the frontend.
  *
- * Expected form fields:
- *   - image     (file, required)
+ * Expected form fields (either form works):
+ *   - image      file, multipart/form-data
+ *   - image_b64  base64 JPEG/PNG/WebP, application/x-www-form-urlencoded.
+ *                The page sends this one: since 21 Oct 2026 InfinityFree blocks
+ *                every multipart/form-data POST (PHP security patch pending).
+ *   - mirrored   '1' for a mirrored front-camera capture
  */
 
 declare(strict_types=1);
@@ -46,19 +50,42 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ---------------------------------------------------------------
 $userId = Auth::requireAuth(); // halts with 401 JSON if not logged in
 
-if (!isset($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
-    respond(422, ['success' => false, 'message' => 'Image upload failed or missing.']);
-}
+$isBase64Upload = isset($_POST['image_b64']) && is_string($_POST['image_b64']) && $_POST['image_b64'] !== '';
 
-$file = $_FILES['image'];
-
-if ($file['size'] > MAX_UPLOAD_SIZE) {
-    respond(413, ['success' => false, 'message' => 'Image exceeds maximum allowed size (8MB).']);
+if ($isBase64Upload) {
+    $b64 = preg_replace('#^data:image/[a-z]+;base64,#i', '', $_POST['image_b64']);
+    // base64 is 4/3 the size of the bytes it encodes — refuse before decoding anything huge
+    if (strlen($b64) > (int) ceil(MAX_UPLOAD_SIZE * 4 / 3) + 4) {
+        respond(413, ['success' => false, 'message' => 'Image exceeds maximum allowed size (8MB).']);
+    }
+    $bytes = base64_decode($b64, true);
+    unset($b64);
+    if ($bytes === false || $bytes === '') {
+        respond(422, ['success' => false, 'message' => 'Image upload failed or missing.']);
+    }
+    $tmpPath = tempnam(sys_get_temp_dir(), 'sg');
+    if ($tmpPath === false || file_put_contents($tmpPath, $bytes) === false) {
+        respond(500, ['success' => false, 'message' => 'Failed to store uploaded image.']);
+    }
+    unset($bytes);
+    register_shutdown_function(static function () use ($tmpPath) {
+        if (is_file($tmpPath)) {
+            @unlink($tmpPath);
+        }
+    });
+} else {
+    if (!isset($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+        respond(422, ['success' => false, 'message' => 'Image upload failed or missing.']);
+    }
+    if ($_FILES['image']['size'] > MAX_UPLOAD_SIZE) {
+        respond(413, ['success' => false, 'message' => 'Image exceeds maximum allowed size (8MB).']);
+    }
+    $tmpPath = $_FILES['image']['tmp_name'];
 }
 
 // Verify real MIME type (never trust the client-supplied one)
 $finfo = finfo_open(FILEINFO_MIME_TYPE);
-$actualMime = finfo_file($finfo, $file['tmp_name']);
+$actualMime = finfo_file($finfo, $tmpPath);
 finfo_close($finfo);
 
 if (!in_array($actualMime, ALLOWED_MIME_TYPES, true)) {
@@ -81,7 +108,9 @@ if (!is_dir(UPLOAD_PROCESSED_DIR)) {
 
 $originalPath = UPLOAD_ORIGINAL_DIR . $uniqueName;
 
-if (!move_uploaded_file($file['tmp_name'], $originalPath)) {
+$stored = $isBase64Upload ? rename($tmpPath, $originalPath) || copy($tmpPath, $originalPath)
+                          : move_uploaded_file($tmpPath, $originalPath);
+if (!$stored) {
     respond(500, ['success' => false, 'message' => 'Failed to store uploaded image.']);
 }
 

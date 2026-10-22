@@ -1755,19 +1755,58 @@ function handleImageFile(file, mirrored = false) {
   submitForAnalysis(file, mirrored);
 }
 
+/* Re-encodes the photo as a JPEG (longest side <= maxSide, EXIF rotation
+ * applied) and returns its base64 text, or null if the browser can't decode it.
+ * The AI shrinks every photo to 1280 px anyway, so nothing is lost. */
+async function imageToJpegBase64(file, maxSide = 1600, quality = 0.9) {
+  try {
+    let src;
+    try {
+      src = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch {
+      src = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    const w0 = src.width || src.naturalWidth, h0 = src.height || src.naturalHeight;
+    const scale = Math.min(1, maxSide / Math.max(w0, h0));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(w0 * scale);
+    canvas.height = Math.round(h0 * scale);
+    canvas.getContext('2d').drawImage(src, 0, 0, canvas.width, canvas.height);
+    if (src.close) src.close();
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    return dataUrl.startsWith('data:image/jpeg') ? dataUrl.split(',')[1] : null;
+  } catch (e) {
+    console.warn('Could not re-encode image, sending the original file:', e);
+    return null;
+  }
+}
+
 async function submitForAnalysis(file, mirrored = false) {
   scanPanel.classList.add('scanning');
   resultsSection.style.display = 'none';
 
-  const formData = new FormData();
-  formData.append('image', file);
-  formData.append('mirrored', mirrored ? '1' : '0');
+  // InfinityFree blocks multipart/form-data POSTs (since 21 Oct 2026), so the
+  // photo goes as base64 in a urlencoded body; multipart only as a fallback.
+  const b64 = await imageToJpegBase64(file);
+  let body;
+  if (b64) {
+    body = new URLSearchParams({ image_b64: b64, mirrored: mirrored ? '1' : '0' });
+  } else {
+    body = new FormData();
+    body.append('image', file);
+    body.append('mirrored', mirrored ? '1' : '0');
+  }
 
   try {
     const res = await fetch(API_ANALYZE_URL, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN },
-      body: formData,
+      body,
     });
 
     if (res.status === 401) {
