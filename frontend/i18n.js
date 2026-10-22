@@ -6,12 +6,13 @@
    translates the page in place: every text node and the placeholder /
    title / aria-label / alt attributes, including content the page adds
    later (a MutationObserver), plus alert()/confirm() messages and the
-   Thai messages the PHP API returns.
+   Thai messages the PHP API returns. In Thai mode the few English labels
+   (menu, section titles, concern names such as "acne") are shown in Thai.
 
      I18N.lang            'th' | 'en' (saved in localStorage)
      I18N.locale          'th-TH' | 'en-GB' for toLocaleDateString
      I18N.setLang('en')   saves the choice and reloads the page
-     I18N.tr('ข้อความ')   English for a Thai string (unchanged in Thai mode)
+     I18N.tr('ข้อความ')   English for a Thai string in English mode
      I18N.articles        English Daily Insights articles, by id
 
    Lookup order for a piece of text: exact match in DICT -> PATTERNS
@@ -274,6 +275,34 @@
   const HAS_THAI = /[฀-๿]/;
   const norm = s => s.replace(/\s+/g, ' ').trim();
 
+  // ------------------------------------------------ Thai mode: the English labels
+  // (menu, section titles, concern names) shown in Thai when TH is chosen
+  const ISSUE_TH = {
+    acne: 'สิว', black_spot: 'จุดด่างดำ', eyebag: 'ถุงใต้ตา', redness: 'รอยแดง',
+    oiliness: 'ความมัน', wrinkle: 'ริ้วรอย', general: 'ทั่วไป',
+  };
+  const DICT_TH = Object.assign({
+    'Analysis': 'วิเคราะห์ผิว',
+    'Daily Insights': 'เกร็ดความรู้รายวัน',
+    'Insight': 'ติดตามผลผิว',
+    'Compare My Skin': 'เปรียบเทียบผิว',
+    'Admin Panel': 'ผู้ดูแลระบบ',
+    'AI Skin Analysis': 'วิเคราะห์ผิวด้วย AI',
+    'Daily Personalised Insights': 'เกร็ดความรู้รายวันสำหรับคุณ',
+    '© 2026 Skin-Glow — AI Skin Analysis & Skincare Recommendation': '© 2026 Skin-Glow — วิเคราะห์ผิวด้วย AI และแนะนำสกินแคร์',
+  }, ISSUE_TH);
+  const TH_PATTERNS = [
+    [/^([a-z_]+) × (\d+)$/, (m, k, n) => (ISSUE_TH[k] ? `${ISSUE_TH[k]} × ${n}` : m)],
+  ];
+  function trTh(s) {
+    const key = norm(s);
+    if (Object.prototype.hasOwnProperty.call(DICT_TH, key)) return DICT_TH[key];
+    for (const [re, rep] of TH_PATTERNS) if (re.test(key)) return key.replace(re, rep);
+    return null;
+  }
+  // which text nodes are worth looking at: Thai ones in English mode, Latin ones in Thai mode
+  const NEEDS = lang === 'en' ? HAS_THAI : /[A-Za-z]/;
+
   function frag(s) { return s.replace(FRAG_RE, k => FRAGMENTS[k]); }
   // translation of a captured part; left as it is when it can't be translated
   function sub(x) { const t = trCore(x); return t == null ? x : t; }
@@ -297,8 +326,8 @@
   }
 
   function tr(s) {
-    if (lang !== 'en' || typeof s !== 'string') return s;
-    const out = trCore(s);
+    if (typeof s !== 'string') return s;
+    const out = lang === 'en' ? trCore(s) : trTh(s);
     if (out == null) return s;
     // keep the original's leading/trailing whitespace
     const lead = s.match(/^\s*/)[0], trail = s.match(/\s*$/)[0];
@@ -311,7 +340,7 @@
   function translateElementAttrs(el) {
     for (const a of ATTRS) {
       const v = el.getAttribute && el.getAttribute(a);
-      if (v && HAS_THAI.test(v)) {
+      if (v && NEEDS.test(v)) {
         const t = tr(v);
         if (t !== v) el.setAttribute(a, t);
       }
@@ -321,7 +350,7 @@
   function translateTree(root) {
     if (!root) return;
     if (root.nodeType === 3) {
-      if (HAS_THAI.test(root.nodeValue)) {
+      if (NEEDS.test(root.nodeValue)) {
         const t = tr(root.nodeValue);
         if (t !== root.nodeValue) root.nodeValue = t;
       }
@@ -342,7 +371,7 @@
           translateElementAttrs(n);
           return NodeFilter.FILTER_SKIP;
         }
-        return HAS_THAI.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        return NEEDS.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
       },
     });
     const nodes = [];
@@ -400,8 +429,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     injectSwitch();
-    if (lang !== 'en') return;
-    document.title = tr(document.title);
+    if (lang === 'en') document.title = tr(document.title);
     translateTree(document.body);
     new MutationObserver(muts => {
       for (const m of muts) {
