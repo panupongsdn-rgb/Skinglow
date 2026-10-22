@@ -283,12 +283,12 @@
   };
   const DICT_TH = Object.assign({
     'Analysis': 'วิเคราะห์ผิว',
-    'Daily Insights': 'เกร็ดความรู้รายวัน',
-    'Insight': 'ติดตามผลผิว',
-    'Compare My Skin': 'เปรียบเทียบผิว',
+    'Daily Insights': 'สาระน่ารู้รายวัน',
+    'Insight': 'ติดตามผลการวิเคราะห์',
+    'Compare My Skin': 'เปรียบเทียบผิวของคุณ',
     'Admin Panel': 'ผู้ดูแลระบบ',
     'AI Skin Analysis': 'วิเคราะห์ผิวด้วย AI',
-    'Daily Personalised Insights': 'เกร็ดความรู้รายวันสำหรับคุณ',
+    'Daily Personalised Insights': 'สาระน่ารู้รายวันสำหรับคุณ',
     '© 2026 Skin-Glow — AI Skin Analysis & Skincare Recommendation': '© 2026 Skin-Glow — วิเคราะห์ผิวด้วย AI และแนะนำสกินแคร์',
   }, ISSUE_TH);
   const TH_PATTERNS = [
