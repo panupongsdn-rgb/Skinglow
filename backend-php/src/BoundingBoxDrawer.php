@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 /**
  * Draws the analysed face zones (thin outlines) and the detection bounding
- * boxes + labels on a face image using the GD library. Detections with
- * "source" => "zone" are whole-zone boxes added by ZoneDetections (thinner line).
+ * boxes + labels on a face image using the GD library.
+ *   source = "zone"     -> CNN result for a whole zone: dashed box, label "CNN acne 82%"
+ *   source = "detector" -> YOLO box: solid box, label "YOLO acne 64%"
+ *   no source           -> plain box, label "acne 64%" (no zone results)
  * Input format for detections (as returned by the AI service):
  * [
  *   ["box" => [x_min, y_min, x_max, y_max], "label" => "acne", "confidence" => 0.85],
@@ -71,18 +73,27 @@ final class BoundingBoxDrawer
             $slot = $labelSlots[$key] ?? 0;
             $labelSlots[$key] = $slot + 1;
 
-            // Rectangle: 3px for exact detector boxes, 2px for whole-zone boxes;
+            $source = $detection['source'] ?? '';
+            // Rectangle: solid 3px for YOLO boxes, dashed 3px for CNN zone boxes;
             // drawn once per box even when several problems share it
             if ($slot === 0) {
-                $thick = (($detection['source'] ?? '') === 'zone') ? 2 : 3;
-                for ($t = 0; $t < $thick; $t++) {
-                    imagerectangle($image, $xMin - $t, $yMin - $t, $xMax + $t, $yMax + $t, $color);
+                if ($source === 'zone') {
+                    $dash = max(6, (int) round(imagesx($image) / 120));
+                    imagesetstyle($image, array_merge(array_fill(0, $dash, $color), array_fill(0, $dash, IMG_COLOR_TRANSPARENT)));
+                    for ($t = 0; $t < 3; $t++) {
+                        imagerectangle($image, $xMin - $t, $yMin - $t, $xMax + $t, $yMax + $t, IMG_COLOR_STYLED);
+                    }
+                } else {
+                    for ($t = 0; $t < 3; $t++) {
+                        imagerectangle($image, $xMin - $t, $yMin - $t, $xMax + $t, $yMax + $t, $color);
+                    }
                 }
             }
 
             // Label: above the box (inside it when there is no room), stacked
             // downwards when one box carries several problems
-            $text = $conf !== null ? sprintf('%s %.0f%%', $label, $conf * 100) : $label;
+            $prefix = $source === 'zone' ? 'CNN ' : ($source === 'detector' ? 'YOLO ' : '');
+            $text = $prefix . ($conf !== null ? sprintf('%s %.0f%%', $label, $conf * 100) : $label);
             $textBoxWidth = imagefontwidth($font) * strlen($text) + 8;
             $top = ($yMin - $lineH >= 0) ? $yMin - $lineH + $slot * $lineH : $yMin + $slot * $lineH;
             if ($slot > 0 && $yMin - $lineH >= 0) {

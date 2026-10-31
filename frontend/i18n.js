@@ -76,6 +76,8 @@
     'ผลิตภัณฑ์แนะนำสำหรับคุณ': 'Recommended products for you',
     'คัดเลือกตามปัญหาผิวที่ตรวจพบ': 'Picked for the concerns that were found',
     'ผลการวิเคราะห์พร้อมกรอบตรวจจับ': 'Analysis result with detection boxes',
+    'กรอบเส้นประ (CNN) = ปัญหาที่พบทั้งโซน · กรอบเส้นทึบ (YOLO) = จุดที่พบ ใช้นับ "กรอบเกิน" ในคะแนนโซน':
+      'Dashed box (CNN) = concern found in the whole zone · Solid box (YOLO) = spot found, counted as "extra boxes" in the zone score',
     'ไม่พบปัญหาชัดเจน': 'No clear concern',
     'ไม่พบปัญหาผิวที่ชัดเจนในทุกโซน': 'No clear skin concern in any zone',
     'ไม่พบปัญหาผิวที่ชัดเจน': 'No clear skin concern found',
@@ -244,6 +246,7 @@
       'You need at least 2 results to compare (you have $1). Scan your skin again.'],
     [/^ห่างกัน (\d+) วัน$/, (m, n) => `${n} day${n === '1' ? '' : 's'} apart`],
     [/^(\d+) นาที$/, '$1 min'],
+    [/^กรอบ YOLO (\d+) · หักเพิ่ม (\d+)$/, 'YOLO boxes $1 · extra −$2'],
     [/^(.+) อ่าน · แตะเพื่อดูเนื้อหาเต็ม$/, '$1 read · tap to read more'],
     [/^(.*) · คะแนน (\S+)$/, '$1 · score $2'],
     [/^(.*) • คะแนนผิว (\S+)$/, '$1 • skin score $2'],

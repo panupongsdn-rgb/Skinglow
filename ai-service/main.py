@@ -158,6 +158,7 @@ class Detection(BaseModel):
     box: List[int]          # [x_min, y_min, x_max, y_max]
     label: str
     confidence: float
+    zone: Optional[str] = None  # zone this box was counted in for the zone score (None = outside every zone)
 
 
 class ZoneIssue(BaseModel):
@@ -781,6 +782,7 @@ def analyze_zones(bgr: np.ndarray, detections: List[Detection]):
             hidden_dets.append(d)
         elif z in per_zone_dets:
             per_zone_dets[z].append(d)
+            d.zone = z  # lets PHP draw exactly the boxes that were counted
     names = [n for n in all_names if n not in hidden]
 
     # probability of each condition per zone
@@ -846,6 +848,9 @@ def apply_zone_analysis(bgr: np.ndarray, result: AnalyzeResponse, mirrored: bool
             if z.zone in _SWAP_SIDE:
                 z.zone = _SWAP_SIDE[z.zone]
                 z.name_th = face_zones.ZONE_TH[z.zone]
+        for d in result.detections:
+            if d.zone in _SWAP_SIDE:
+                d.zone = _SWAP_SIDE[d.zone]
         zones.sort(key=lambda z: face_zones.ZONE_NAMES.index(z.zone))
     result.zones = zones
     result.zone_model_type = ZONE_MODEL_TYPE

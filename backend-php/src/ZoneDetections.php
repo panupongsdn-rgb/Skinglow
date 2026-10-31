@@ -82,6 +82,59 @@ final class ZoneDetections
         return $kept;
     }
 
+    /**
+     * What to draw on the photo so the picture explains the zone scores:
+     *   - one dashed CNN box per zone problem (around the whole zone, since the
+     *     classifier says WHAT a zone has, not where): source = "zone";
+     *   - every YOLO box that was counted in a zone's score (the "B" in
+     *     extra boxes = B - number of CNN problems): source = "detector".
+     * The AI tags each counted box with its zone; older AI responses without
+     * the tag fall back to the zone under the box centre. Boxes outside every
+     * zone are not counted, so they are not drawn.
+     *
+     * @param array $rawDetections YOLO boxes exactly as the AI returned them
+     * @param array $zones         zone results (with issues)
+     */
+    public static function drawList(array $rawDetections, array $zones): array
+    {
+        $out = [];
+        foreach ($zones as $z) {
+            foreach (($z['issues'] ?? []) as $issue) {
+                if (!isset($issue['label'])) {
+                    continue;
+                }
+                foreach (self::zoneBoxes($z) as $box) {
+                    $out[] = [
+                        'box'        => $box,
+                        'label'      => $issue['label'],
+                        'confidence' => (float) ($issue['probability'] ?? 0),
+                        'zone'       => $z['zone'] ?? null,
+                        'source'     => 'zone',
+                    ];
+                }
+            }
+        }
+        $zoneNames = array_column($zones, 'zone');
+        foreach ($rawDetections as $d) {
+            $box = $d['box'] ?? null;
+            if (!is_array($box) || count($box) !== 4) {
+                continue;
+            }
+            $zone = $d['zone'] ?? null;
+            if ($zone === null && !array_key_exists('zone', $d)) {
+                $at = self::zoneAt($zones, ($box[0] + $box[2]) / 2, ($box[1] + $box[3]) / 2);
+                $zone = $at['zone'] ?? null;
+            }
+            if ($zone === null || !in_array($zone, $zoneNames, true)) {
+                continue;
+            }
+            $d['zone'] = $zone;
+            $d['source'] = 'detector';
+            $out[] = $d;
+        }
+        return $out;
+    }
+
     /** One box per outline of the zone (under-eye has two), else the zone box. */
     private static function zoneBoxes(array $zone): array
     {
