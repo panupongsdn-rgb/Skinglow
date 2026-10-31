@@ -192,7 +192,13 @@ if ($skinStatus === 'no_face_detected') {
 // 4. Draw bounding boxes onto a copy of the image (GD library)
 // ---------------------------------------------------------------
 $processedPath = UPLOAD_PROCESSED_DIR . $uniqueName;
-$drawSuccess = BoundingBoxDrawer::draw($originalPath, $detections, $processedPath, $zones);
+// With zone results, draw every CNN zone result and every YOLO box that was
+// counted in a zone score, so the picture matches the zone-score formula.
+// $detections (used for counts and history) is unchanged.
+$toDraw = (($aiResult['zone_model_type'] ?? '') === 'zone_classifier' && $zones)
+    ? ZoneDetections::drawList($aiResult['detections'], $zones)
+    : $detections;
+$drawSuccess = BoundingBoxDrawer::draw($originalPath, $toDraw, $processedPath, $zones);
 
 if (!$drawSuccess) {
     // Not fatal - fall back to the original image if drawing failed

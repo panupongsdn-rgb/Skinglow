@@ -239,6 +239,8 @@
   .zone-card .z-issue{
     font-size:.72rem; padding:3px 8px; border-radius:999px; color:#fff; white-space:nowrap;
   }
+  .zone-card .z-boxes{font-size:.7rem; color:var(--ink-soft); margin-top:8px;}
+  .box-legend{font-size:.75rem; color:var(--ink-soft); margin:8px 2px 0; line-height:1.5;}
   .zone-card .z-clear{font-size:.76rem; color:var(--ink-soft);}
   .zone-note{font-size:.72rem; color:var(--ink-soft); margin-top:8px;}
 
@@ -1151,6 +1153,7 @@ main{
         <div class="result-image-wrap">
           <img id="resultImage" alt="ผลการวิเคราะห์พร้อมกรอบตรวจจับ">
         </div>
+        <p class="box-legend">กรอบเส้นประ (CNN) = ปัญหาที่พบทั้งโซน · กรอบเส้นทึบ (YOLO) = จุดที่พบ ใช้นับ "กรอบเกิน" ในคะแนนโซน</p>
       </div>
 
       <div>
@@ -1923,6 +1926,13 @@ function buildZoneCards(grid, zones) {
       const pct = Math.round((i.probability ?? 0) * 100);
       return `<span class="z-issue" style="background:${color}">${escapeHtml(i.label_th || i.label)} ${pct}%</span>`;
     }).join('');
+    // how the score was reached: YOLO boxes beyond the CNN problems cost 3 each, at most 15
+    let boxLine = '';
+    if (typeof z.detection_count === 'number') {
+      const extra = Math.max(0, z.detection_count - (z.issues || []).length);
+      const minus = Math.min(15, 3 * extra);
+      boxLine = `<div class="z-boxes">กรอบ YOLO ${z.detection_count} · หักเพิ่ม ${minus}</div>`;
+    }
     const card = document.createElement('div');
     card.className = 'zone-card';
     card.innerHTML = `
@@ -1932,6 +1942,7 @@ function buildZoneCards(grid, zones) {
       </div>
       <div class="z-bar"><span style="width:${Math.max(0, Math.min(100, score))}%"></span></div>
       <div class="z-issues">${issues || '<span class="z-clear">ไม่พบปัญหาชัดเจน</span>'}</div>
+      ${boxLine}
     `;
     grid.appendChild(card);
   });
